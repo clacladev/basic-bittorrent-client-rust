@@ -25,7 +25,16 @@ fn convert_bencode_value_to_json_value(
                 .collect::<anyhow::Result<Vec<serde_json::Value>>>()?;
             Ok(serde_json::Value::Array(array))
         }
-        _ => panic!("Unhandled bencode value: {:?}", value),
+        serde_bencode::value::Value::Dict(hash_map) => {
+            let mut map = serde_json::Map::new();
+            for (key_bytes, json_value) in hash_map {
+                let key = String::from_utf8(key_bytes)
+                    .map_err(|_| anyhow::anyhow!("Failed to convert key to string"))?;
+                let value = convert_bencode_value_to_json_value(json_value)?;
+                map.insert(key, value);
+            }
+            Ok(serde_json::Value::Object(map))
+        }
     }
 }
 
