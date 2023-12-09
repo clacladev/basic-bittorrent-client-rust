@@ -2,36 +2,45 @@ use serde_bencode;
 use std::env;
 
 #[allow(dead_code)]
-fn decode_bencoded_value(encoded_value: &str) -> serde_json::Value {
-    let mut encoded_value_chars = encoded_value.chars();
-    let encoded_value_first_char = encoded_value_chars.next().unwrap();
+fn decode_bencoded_value(encoded_value: &str) -> anyhow::Result<serde_json::Value> {
+    let value: serde_bencode::value::Value = serde_bencode::from_str(encoded_value)?;
+    convert_bencode_value_to_json_value(value)
+}
 
-    if encoded_value_first_char.is_digit(10) {
-        // If encoded_value starts with a digit, it's a string
-        // Example: "5:hello" -> "hello"
-        let decoded_value: String = serde_bencode::de::from_str(&encoded_value)
-            .unwrap_or_else(|e| panic!("Failed to decode: {}. Error: {}", encoded_value, e));
-        return serde_json::Value::String(decoded_value.to_string());
-    } else if encoded_value_first_char.eq(&'i') {
-        // It's an integer
-        let decoded_value: i64 = serde_bencode::de::from_str(&encoded_value)
-            .unwrap_or_else(|e| panic!("Failed to decode: {}. Error: {}", encoded_value, e));
-        return serde_json::Value::Number(serde_json::Number::from(decoded_value));
-    } else {
-        panic!("Unhandled encoded value: {}", encoded_value)
+fn convert_bencode_value_to_json_value(
+    value: serde_bencode::value::Value,
+) -> anyhow::Result<serde_json::Value> {
+    match value {
+        serde_bencode::value::Value::Bytes(bytes) => {
+            let string = String::from_utf8(bytes)?;
+            Ok(serde_json::Value::String(string))
+        }
+        serde_bencode::value::Value::Int(int) => {
+            Ok(serde_json::Value::Number(serde_json::Number::from(int)))
+        }
+        serde_bencode::value::Value::List(values) => {
+            let array = values
+                .into_iter()
+                .map(|item| convert_bencode_value_to_json_value(item))
+                .collect::<anyhow::Result<Vec<serde_json::Value>>>()?;
+            Ok(serde_json::Value::Array(array))
+        }
+        _ => panic!("Unhandled bencode value: {:?}", value),
     }
 }
 
 // Usage: your_bittorrent.sh decode "<encoded_value>"
-fn main() {
+fn main() -> anyhow::Result<()> {
     let args: Vec<String> = env::args().collect();
     let command = &args[1];
 
     if command == "decode" {
         let encoded_value = &args[2];
-        let decoded_value = decode_bencoded_value(encoded_value);
-        println!("{}", decoded_value.to_string());
+        let decoded_value = decode_bencoded_value(encoded_value)?;
+        println!("{}", decoded_value);
     } else {
         println!("unknown command: {}", args[1])
     }
+
+    Ok(())
 }
