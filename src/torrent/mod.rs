@@ -1,5 +1,5 @@
+use serde::{Deserialize, Serialize};
 use serde_bencode;
-use serde_derive::{Deserialize, Serialize};
 use std::fs;
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
