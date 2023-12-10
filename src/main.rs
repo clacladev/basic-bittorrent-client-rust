@@ -18,6 +18,7 @@ fn main() -> anyhow::Result<()> {
         let torrent = decode_torrent_file(file_path)?;
         println!("Tracker URL: {}", torrent.announce);
         println!("Length: {}", torrent.info.length);
+        println!("Info Hash: {}", torrent.info.hash()?)
     } else {
         println!("unknown command: {}", args[1])
     }
