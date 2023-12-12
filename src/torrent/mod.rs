@@ -27,6 +27,20 @@ impl Info {
         let hash = format!("{:x}", raw_hash);
         Ok(hash)
     }
+
+    pub fn pieces_hashes(&self) -> anyhow::Result<Vec<String>> {
+        let hashes: Vec<String> = self
+            .pieces
+            .chunks(20)
+            .map(|chunk| {
+                chunk
+                    .iter()
+                    .map(|&byte| format!("{:02x}", byte))
+                    .collect::<String>()
+            })
+            .collect();
+        Ok(hashes)
+    }
 }
 
 pub fn decode_torrent_file(file_path: &str) -> anyhow::Result<TorrentMetainfo> {
