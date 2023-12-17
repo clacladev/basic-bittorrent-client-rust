@@ -33,8 +33,11 @@ async fn main() -> anyhow::Result<()> {
     } else if command == "peers" {
         let file_path = &args[2];
         let torrent = decode_torrent_file(file_path)?;
-        tracker_get(&torrent).await?;
-        // println!("{}", tracker_response.);
+        let tracker_response = tracker_get(&torrent).await?;
+        tracker_response
+            .peers()
+            .iter()
+            .for_each(|peer| println!("{peer}"));
     } else {
         println!("unknown command: {}", args[1])
     }

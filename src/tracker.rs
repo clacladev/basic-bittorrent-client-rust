@@ -1,10 +1,26 @@
 use crate::torrent::TorrentMetainfo;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct TrackerResponse {
-    #[serde(rename = "peers")]
-    pub raw_peers_string: String,
+    #[serde(rename = "peers", with = "serde_bytes")]
+    pub raw_peers_string: Vec<u8>,
+}
+
+impl TrackerResponse {
+    pub fn peers(&self) -> Vec<String> {
+        return self
+            .raw_peers_string
+            .chunks_exact(6)
+            .map(|chunk| {
+                let port: u16 = ((chunk[4] as u16) << 8) | (chunk[5] as u16);
+                return format!(
+                    "{}.{}.{}.{}:{}",
+                    chunk[0], chunk[1], chunk[2], chunk[3], port
+                );
+            })
+            .collect();
+    }
 }
 
 pub async fn tracker_get(torrent: &TorrentMetainfo) -> anyhow::Result<TrackerResponse> {
@@ -23,10 +39,6 @@ pub async fn tracker_get(torrent: &TorrentMetainfo) -> anyhow::Result<TrackerRes
         "{}?info_hash={}&{}",
         torrent.announce, info_hash, encoded_params
     );
-    println!("{url}");
-
-    let response = reqwest::get(&url).await?.text().await?;
-    println!("Response: {}", response);
 
     let bytes = reqwest::get(&url).await?.bytes().await?;
     let tracker_response: TrackerResponse = serde_bencode::from_bytes(&bytes)?;
