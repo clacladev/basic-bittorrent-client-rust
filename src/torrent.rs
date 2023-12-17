@@ -19,7 +19,7 @@ pub struct Info {
 }
 
 impl Info {
-    fn hash_bytes(&self) -> anyhow::Result<Vec<u8>> {
+    pub fn hash_bytes(&self) -> anyhow::Result<Vec<u8>> {
         let mut hasher = Sha1::new();
         let bytes = serde_bencode::to_bytes(self)?;
         hasher.update(bytes);

@@ -1,10 +1,12 @@
 use cli::Command;
+use handshake::handshake;
 use std::env;
 use torrent::decode_torrent_file;
 use tracker::tracker_get;
 
 mod bencode;
 mod cli;
+mod handshake;
 mod torrent;
 mod tracker;
 
@@ -51,7 +53,16 @@ async fn main() -> anyhow::Result<()> {
                 .iter()
                 .for_each(|peer| println!("{peer}"));
         }
-        Command::Handshake => {}
+        Command::Handshake => {
+            let file_path = &args[2];
+            let torrent = decode_torrent_file(file_path)?;
+            let tracker_response = tracker_get(&torrent).await?;
+            let peers = tracker_response.peers();
+            let target_peer = peers.first().unwrap();
+            let info_hash = torrent.info.hash_bytes()?;
+            let peer_id = handshake(target_peer, &info_hash).await?;
+            println!("Peer ID: {}", peer_id);
+        }
     }
 
     Ok(())
