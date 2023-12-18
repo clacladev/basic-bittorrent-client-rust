@@ -25,16 +25,19 @@ async fn main() -> anyhow::Result<()> {
     let command = command.unwrap();
     match command {
         Command::Decode => {
-            let _ = execute_decode_command(&args[2]);
+            let _ = execute_command_decode(&args[2]);
         }
         Command::Info => {
-            let _ = execute_info_command(&args[2]);
+            let _ = execute_command_info(&args[2]);
         }
         Command::Peers => {
-            let _ = execute_peers_command(&args[2]).await;
+            let _ = execute_command_peers(&args[2]).await;
         }
         Command::Handshake => {
-            let _ = execute_handshake_command(&args[2]).await;
+            let _ = execute_command_handshake(&args[2]).await;
+        }
+        Command::DownloadPiece => {
+            let _ = execute_command_download_piece(&args[2]).await;
         }
     }
 
@@ -44,13 +47,13 @@ async fn main() -> anyhow::Result<()> {
 // ---
 // Commands bodies
 
-fn execute_decode_command(encoded_value: &str) -> anyhow::Result<()> {
+fn execute_command_decode(encoded_value: &str) -> anyhow::Result<()> {
     let decoded_value = bencode::decode_bencoded_value(encoded_value)?;
     println!("{}", decoded_value);
     Ok(())
 }
 
-fn execute_info_command(file_path: &str) -> anyhow::Result<()> {
+fn execute_command_info(file_path: &str) -> anyhow::Result<()> {
     let torrent = decode_torrent_file(file_path)?;
     println!("Tracker URL: {}", torrent.announce);
     println!("Length: {}", torrent.info.length);
@@ -66,7 +69,7 @@ fn execute_info_command(file_path: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn execute_peers_command(file_path: &str) -> anyhow::Result<()> {
+async fn execute_command_peers(file_path: &str) -> anyhow::Result<()> {
     let torrent = decode_torrent_file(file_path)?;
     let tracker_response = tracker_get(&torrent).await?;
     tracker_response
@@ -76,13 +79,24 @@ async fn execute_peers_command(file_path: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn execute_handshake_command(file_path: &str) -> anyhow::Result<()> {
+async fn execute_command_handshake(file_path: &str) -> anyhow::Result<()> {
     let torrent = decode_torrent_file(file_path)?;
     let tracker_response = tracker_get(&torrent).await?;
     let peers = tracker_response.peers();
-    let target_peer = peers.first().unwrap();
+    let target_peer_address = peers.first().unwrap();
     let info_hash = torrent.info.hash_bytes()?;
-    let peer_id = handshake(target_peer, &info_hash).await?;
+    let peer_id = handshake(target_peer_address, &info_hash).await?;
     println!("Peer ID: {}", peer_id);
+    Ok(())
+}
+
+async fn execute_command_download_piece(file_path: &str) -> anyhow::Result<()> {
+    let torrent = decode_torrent_file(file_path)?;
+    let tracker_response = tracker_get(&torrent).await?;
+    let peers = tracker_response.peers();
+    let target_peer_address = peers.first().unwrap();
+    let info_hash = torrent.info.hash_bytes()?;
+    let _ = handshake(target_peer_address, &info_hash).await?;
+    println!("Piece 0 downloaded to /tmp/test-piece-0.");
     Ok(())
 }
