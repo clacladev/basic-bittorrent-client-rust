@@ -29,10 +29,7 @@ impl PeerHandshakeMessage {
 }
 
 // Perform an handshake with a peer and receives back a peer ID
-pub async fn handshake(peer_address: &str, info_hash: &[u8]) -> io::Result<String> {
-    // Connect to the peer
-    let mut stream = TcpStream::connect(peer_address).await?;
-
+pub async fn handshake(stream: &mut TcpStream, info_hash: &[u8]) -> io::Result<String> {
     // Prepare the handshake message
     let handshake_message =
         PeerHandshakeMessage::new(info_hash.into(), "00112233445566778899".into());

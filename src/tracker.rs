@@ -1,4 +1,4 @@
-use crate::torrent::TorrentMetainfo;
+use crate::torrent_file::TorrentMetainfo;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
