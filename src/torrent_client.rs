@@ -1,9 +1,17 @@
+use std::borrow::BorrowMut;
+
+use tokio::io::AsyncReadExt;
 use tokio::net::TcpStream;
 
+mod peer_messages;
+
 use crate::{
+    handshake,
     torrent_file::{decode_torrent_file, TorrentMetainfo},
     tracker::tracker_get,
 };
+
+use self::peer_messages::PeerMessage;
 
 pub enum Error {
     TcpStreamNotAvailable,
@@ -58,24 +66,38 @@ impl TorrentClient {
     }
 
     pub async fn handshake(&mut self) -> anyhow::Result<()> {
-        if let None = self.stream {
-            return Err(anyhow::Error::msg(Error::TcpStreamNotAvailable.to_string()));
-        }
+        let stream = self
+            .stream
+            .as_mut()
+            .ok_or_else(|| anyhow::Error::msg(Error::TcpStreamNotAvailable.to_string()))?;
 
-        let peer = self.peers.first().unwrap();
-        self.stream = Some(TcpStream::connect(peer).await?);
+        let info_hash = self.torrent_metainfo.info.hash_bytes()?;
+        let _ = handshake(stream.borrow_mut(), &info_hash).await?;
         Ok(())
     }
 
     pub async fn download_piece(
-        &self,
-        piece_index: &u8,
-        output_file_path: &str,
+        &mut self,
+        // piece_index: &u8,
+        // output_file_path: &str,
     ) -> anyhow::Result<()> {
+        let stream = self
+            .stream
+            .as_mut()
+            .ok_or_else(|| anyhow::Error::msg(Error::TcpStreamNotAvailable.to_string()))?;
+
+        let mut buffer: Vec<u8> = vec![];
+        let read_length = stream.read(&mut buffer).await?;
+
+        // Tcp keepalive message to be ignored
+        if read_length == 0 {
+            println!("> keepalive");
+            return Ok(());
+        }
+
+        let message = PeerMessage::from_bytes(buffer.as_slice())?;
+        println!("> message: {:?}", message);
+
         Ok(())
     }
 }
-
-// let info_hash = torrent.info.hash_bytes()?;
-// let mut stream = TcpStream::connect(target_peer_address).await?;
-// let _ = handshake(&mut stream, &info_hash).await?;
