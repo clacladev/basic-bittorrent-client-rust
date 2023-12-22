@@ -92,11 +92,12 @@ impl TorrentClient {
         loop {
             match stream.read(&mut buffer).await {
                 Ok(0) => {
+                    eprintln!("> 0 length message");
                     break; // The peer has closed the connection
                 }
                 Ok(n) => {
                     let message = PeerMessage::from_bytes(&buffer[..n])?;
-                    println!("> message: {:?}", message);
+                    println!("> Message: {:?}", message);
                 }
                 Err(error) => {
                     eprintln!("Failed to receive data: {}", error);
