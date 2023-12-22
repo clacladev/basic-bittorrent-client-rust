@@ -86,17 +86,24 @@ impl TorrentClient {
             .as_mut()
             .ok_or_else(|| anyhow::Error::msg(Error::TcpStreamNotAvailable.to_string()))?;
 
-        let mut buffer: Vec<u8> = vec![];
-        let read_length = stream.read(&mut buffer).await?;
+        // Buffer of max 16kb (16,384 bytes) as per spec
+        let mut buffer = [0; 16_384];
 
-        // Tcp keepalive message to be ignored
-        if read_length == 0 {
-            println!("> keepalive");
-            return Ok(());
+        loop {
+            match stream.read(&mut buffer).await {
+                Ok(0) => {
+                    break; // The peer has closed the connection
+                }
+                Ok(n) => {
+                    let message = PeerMessage::from_bytes(&buffer[..n])?;
+                    println!("> message: {:?}", message);
+                }
+                Err(error) => {
+                    eprintln!("Failed to receive data: {}", error);
+                    return Err(anyhow::Error::new(error));
+                }
+            }
         }
-
-        let message = PeerMessage::from_bytes(buffer.as_slice())?;
-        println!("> message: {:?}", message);
 
         Ok(())
     }

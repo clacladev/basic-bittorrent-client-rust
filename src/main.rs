@@ -118,7 +118,12 @@ async fn execute_command_download_piece(
     client.fetch_peers().await?;
     client.connect().await?;
     client.handshake().await?;
+
     // client.download_piece(piece_index, output_file_path).await?;
-    client.download_piece().await?;
+    let result = client.download_piece().await;
+    if let Err(error) = result {
+        eprintln!("Error downloading piece: {}", error);
+    }
+
     Ok(())
 }
