@@ -4,8 +4,12 @@ use std::{
     str::FromStr,
 };
 
-use tokio::{io::AsyncReadExt, net::TcpStream};
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::TcpStream,
+};
 
+mod error;
 mod peer_messages;
 
 use crate::{
@@ -14,21 +18,8 @@ use crate::{
     tracker::tracker_get,
 };
 
+use self::error::Error;
 use self::peer_messages::PeerMessage;
-
-pub enum Error {
-    TcpStreamNotAvailable,
-    MessageBodyNotReadCorrect,
-}
-
-impl Error {
-    pub fn to_string(&self) -> String {
-        match self {
-            Self::TcpStreamNotAvailable => "Tcp stream not available".to_string(),
-            Self::MessageBodyNotReadCorrect => "Message body was not read correct".to_string(),
-        }
-    }
-}
 
 pub struct TorrentClient {
     pub torrent_metainfo: TorrentMetainfo,
@@ -140,6 +131,19 @@ impl TorrentClient {
             // Make a peer message with the id and body read
             let peer_message = PeerMessage::from_bytes(message_id, message_body.as_slice())?;
             println!("> peer_message: {:?}", peer_message);
+
+            // Actionate a message if necessary
+            match peer_message {
+                PeerMessage::Bitfield(_) => {
+                    // Send an interested message
+                    let response_message = PeerMessage::Interested;
+                    if let Some(response_bytes) = response_message.to_bytes() {
+                        println!("Write interested message");
+                        stream.write_all(&response_bytes).await?;
+                    }
+                }
+                _ => break,
+            }
         }
 
         Ok(())
