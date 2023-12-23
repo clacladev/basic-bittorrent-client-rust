@@ -17,6 +17,9 @@ use crate::{
 
 use self::peer_messages::PeerMessage;
 
+// Buffer of max 16kb (16,384 bytes) as per spec
+const PEER_MESSAGE_MAX_SIZE: usize = 16_384;
+
 pub enum Error {
     TcpStreamNotAvailable,
 }
@@ -109,8 +112,7 @@ impl TorrentClient {
             .as_mut()
             .ok_or_else(|| anyhow::Error::msg(Error::TcpStreamNotAvailable.to_string()))?;
 
-        // Buffer of max 16kb (16,384 bytes) as per spec
-        let mut buffer = [0; 16_384];
+        let mut buffer = [0u8; PEER_MESSAGE_MAX_SIZE];
 
         loop {
             match stream.read(&mut buffer).await {
