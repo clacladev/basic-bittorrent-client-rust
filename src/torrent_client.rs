@@ -77,6 +77,7 @@ impl TorrentClient {
     pub async fn connect(&mut self) -> anyhow::Result<()> {
         let peer = self.peers.first().unwrap();
         self.stream = Some(TcpStream::connect(peer).await?);
+        println!("> Connected");
         Ok(())
     }
 
@@ -88,6 +89,7 @@ impl TorrentClient {
 
         let info_hash = self.torrent_metainfo.info.hash_bytes()?;
         let _ = handshake(stream.borrow_mut(), &info_hash).await?;
+        println!("> Handshake successful");
         Ok(())
     }
 
@@ -105,47 +107,54 @@ impl TorrentClient {
             // Wait for the stream to be available
             stream.readable().await?;
 
-            // Read the message size (first 4 bytes)
-            let message_size = stream.read_u32().await?;
-            if message_size == 0 {
-                break; // The peer has closed the connection
-            }
-
-            // Read the message id (following 1 byte)
-            let message_id = stream.read_u8().await?;
-
-            // Read the message body if necessary (following n bytes)
-            let message_body_size = (message_size - 1) as usize;
-            let mut message_body = vec![0u8; message_body_size];
-
-            if message_body_size > 0 {
-                // Read the
-                let read_length = stream.read(&mut message_body).await?;
-                if message_body_size != read_length {
-                    return Err(anyhow::Error::msg(
-                        Error::MessageBodyNotReadCorrect.to_string(),
-                    ));
-                }
-            }
-
-            // Make a peer message with the id and body read
-            let peer_message = PeerMessage::from_bytes(message_id, message_body.as_slice())?;
-            println!("> peer_message: {:?}", peer_message);
+            // Read a message
+            let message = Self::read_message(stream).await?;
+            println!("> Received message: {:?}", message);
 
             // Actionate a message if necessary
-            match peer_message {
+            match message {
                 PeerMessage::Bitfield(_) => {
                     // Send an interested message
-                    let response_message = PeerMessage::Interested;
-                    if let Some(response_bytes) = response_message.to_bytes() {
-                        println!("Write interested message");
-                        stream.write_all(&response_bytes).await?;
-                    }
+                    Self::send_message(stream, PeerMessage::Interested).await?;
                 }
-                _ => break,
+                _ => {}
+            }
+        }
+    }
+
+    async fn read_message(stream: &mut TcpStream) -> anyhow::Result<PeerMessage> {
+        // Read the message size (first 4 bytes)
+        let message_size = stream.read_u32().await?;
+        if message_size == 0 {
+            return Err(anyhow::Error::msg(Error::PeerClosedConnection.to_string()));
+        }
+
+        // Read the message id (following 1 byte)
+        let message_id = stream.read_u8().await?;
+
+        // Read the message body if necessary (following n bytes)
+        let message_body_size = (message_size - 1) as usize;
+        let mut message_body = vec![0u8; message_body_size];
+
+        if message_body_size > 0 {
+            // Read the
+            let read_length = stream.read(&mut message_body).await?;
+            if message_body_size != read_length {
+                return Err(anyhow::Error::msg(
+                    Error::MessageBodyNotReadCorrect.to_string(),
+                ));
             }
         }
 
+        // Make a peer message with the id and body read
+        PeerMessage::from_bytes(message_id, message_body.as_slice())
+    }
+
+    async fn send_message(stream: &mut TcpStream, message: PeerMessage) -> anyhow::Result<()> {
+        if let Some(message_bytes) = message.to_bytes() {
+            stream.write_all(&message_bytes).await?;
+            println!("> Sent message: {:?}", message);
+        }
         Ok(())
     }
 }

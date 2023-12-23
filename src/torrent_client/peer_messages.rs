@@ -31,14 +31,16 @@ impl PeerMessage {
 
     pub fn to_bytes(&self) -> Option<Vec<u8>> {
         match self {
-            Self::Interested => {
-                let message_length: u32 = 1;
-                let mut bytes = vec![0u8; 5];
-                bytes[0..4].copy_from_slice(&message_length.to_be_bytes());
-                bytes[4] = self.id();
-                Some(bytes)
-            }
+            Self::Interested => Some(Self::get_empty_peer_message(self.id())),
             _ => None,
         }
+    }
+
+    fn get_empty_peer_message(id: u8) -> Vec<u8> {
+        let message_length: u32 = 1;
+        let mut bytes = vec![0u8; 5];
+        bytes[0..4].copy_from_slice(&message_length.to_be_bytes());
+        bytes[4] = id;
+        bytes
     }
 }
