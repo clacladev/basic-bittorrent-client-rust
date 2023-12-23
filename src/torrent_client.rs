@@ -4,8 +4,7 @@ use std::{
     str::FromStr,
 };
 
-use tokio::io::AsyncReadExt;
-use tokio::net::TcpStream;
+use tokio::{io::AsyncReadExt, net::TcpStream};
 
 mod peer_messages;
 
@@ -17,17 +16,16 @@ use crate::{
 
 use self::peer_messages::PeerMessage;
 
-// Buffer of max 16kb (16,384 bytes) as per spec
-const PEER_MESSAGE_MAX_SIZE: usize = 16_384;
-
 pub enum Error {
     TcpStreamNotAvailable,
+    MessageBodyNotReadCorrect,
 }
 
 impl Error {
     pub fn to_string(&self) -> String {
         match self {
             Self::TcpStreamNotAvailable => "Tcp stream not available".to_string(),
+            Self::MessageBodyNotReadCorrect => "Message body was not read correct".to_string(),
         }
     }
 }
@@ -112,23 +110,36 @@ impl TorrentClient {
             .as_mut()
             .ok_or_else(|| anyhow::Error::msg(Error::TcpStreamNotAvailable.to_string()))?;
 
-        let mut buffer = [0u8; PEER_MESSAGE_MAX_SIZE];
-
         loop {
-            match stream.read(&mut buffer).await {
-                Ok(0) => {
-                    eprintln!("> 0 length message");
-                    break; // The peer has closed the connection
-                }
-                Ok(n) => {
-                    let message = PeerMessage::from_bytes(&buffer[..n])?;
-                    println!("> Message: {:?}", message);
-                }
-                Err(error) => {
-                    eprintln!("Failed to receive data: {}", error);
-                    return Err(anyhow::Error::new(error));
+            // Wait for the stream to be available
+            stream.readable().await?;
+
+            // Read the message size (first 4 bytes)
+            let message_size = stream.read_u32().await?;
+            if message_size == 0 {
+                break; // The peer has closed the connection
+            }
+
+            // Read the message id (following 1 byte)
+            let message_id = stream.read_u8().await?;
+
+            // Read the message body if necessary (following n bytes)
+            let message_body_size = (message_size - 1) as usize;
+            let mut message_body = vec![0u8; message_body_size];
+
+            if message_body_size > 0 {
+                // Read the
+                let read_length = stream.read(&mut message_body).await?;
+                if message_body_size != read_length {
+                    return Err(anyhow::Error::msg(
+                        Error::MessageBodyNotReadCorrect.to_string(),
+                    ));
                 }
             }
+
+            // Make a peer message with the id and body read
+            let peer_message = PeerMessage::from_bytes(message_id, message_body.as_slice())?;
+            println!("> peer_message: {:?}", peer_message);
         }
 
         Ok(())
