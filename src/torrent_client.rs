@@ -1,4 +1,8 @@
-use std::borrow::BorrowMut;
+use std::{
+    borrow::BorrowMut,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    str::FromStr,
+};
 
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpStream;
@@ -27,7 +31,7 @@ impl Error {
 
 pub struct TorrentClient {
     pub torrent_metainfo: TorrentMetainfo,
-    pub peers: Vec<String>,
+    pub peers: Vec<SocketAddr>,
     stream: Option<TcpStream>,
 }
 
@@ -51,8 +55,27 @@ impl TorrentClient {
 impl TorrentClient {
     pub async fn fetch_peers(&mut self) -> anyhow::Result<()> {
         let tracker_response = tracker_get(&self.torrent_metainfo).await?;
-        let peers = tracker_response.peers();
-        self.peers = peers;
+
+        self.peers = tracker_response
+            .peers()
+            .iter()
+            .filter_map(|peer_string| {
+                let parts: Vec<&str> = peer_string.split(":").collect();
+                if parts.len() != 2 {
+                    return None;
+                }
+                let ip = match Ipv4Addr::from_str(parts[0]) {
+                    Ok(ip) => IpAddr::V4(ip),
+                    Err(_) => return None,
+                };
+                let port = match parts[1].parse() {
+                    Ok(p) => p,
+                    Err(_) => return None,
+                };
+                Some(SocketAddr::new(ip, port))
+            })
+            .collect();
+
         Ok(())
     }
 }
