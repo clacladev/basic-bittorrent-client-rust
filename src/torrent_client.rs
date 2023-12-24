@@ -1,4 +1,5 @@
 use std::{
+    fs,
     net::{IpAddr, Ipv4Addr, SocketAddr},
     str::FromStr,
 };
@@ -9,17 +10,15 @@ use tokio::{
 };
 
 mod error;
+mod get_trackers;
 mod handshake_message;
 mod peer_message;
+mod torrent_metainfo;
 
-use crate::{
-    torrent_client::handshake_message::HandshakeMessage,
-    torrent_file::{decode_torrent_file, TorrentMetainfo},
-    tracker::tracker_get,
-};
-
-use self::error::Error;
+use self::get_trackers::{GetTrackersRequest, GetTrackersResponse};
+use self::handshake_message::HandshakeMessage;
 use self::peer_message::PeerMessage;
+use self::{error::Error, torrent_metainfo::TorrentMetainfo};
 
 const PEER_ID: &str = "00112233445566778899";
 const PIECE_BLOCK_SIZE: u32 = 16_384; // 16 KiB
@@ -40,8 +39,9 @@ impl TorrentClient {
         }
     }
 
-    pub async fn from_torrent_file(file_path: &str) -> anyhow::Result<Self> {
-        let torrent_metainfo = decode_torrent_file(file_path)?;
+    pub fn from_torrent_file(file_path: &str) -> anyhow::Result<Self> {
+        let content = fs::read(file_path)?;
+        let torrent_metainfo: TorrentMetainfo = serde_bencode::from_bytes(&content)?;
         Ok(Self::new(torrent_metainfo))
     }
 }
@@ -49,7 +49,10 @@ impl TorrentClient {
 // Peers related
 impl TorrentClient {
     pub async fn fetch_peers(&mut self) -> anyhow::Result<()> {
-        let tracker_response = tracker_get(&self.torrent_metainfo).await?;
+        let get_trackers_request = GetTrackersRequest::new(PEER_ID, self.torrent_metainfo.clone());
+        let get_trackers_url = get_trackers_request.to_url()?;
+        let response_bytes = reqwest::get(&get_trackers_url).await?.bytes().await?;
+        let tracker_response: GetTrackersResponse = serde_bencode::from_bytes(&response_bytes)?;
 
         self.peers = tracker_response
             .peers()

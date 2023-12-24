@@ -1,15 +1,11 @@
 use cli::Command;
 use std::env::{self};
-use torrent_file::decode_torrent_file;
-use tracker::tracker_get;
 
 use crate::torrent_client::TorrentClient;
 
 mod bencode;
 mod cli;
 mod torrent_client;
-mod torrent_file;
-mod tracker;
 
 // Usage: your_bittorrent.sh decode "<encoded_value>"
 #[tokio::main]
@@ -64,7 +60,8 @@ fn execute_command_decode(encoded_value: &str) -> anyhow::Result<()> {
 }
 
 fn execute_command_info(file_path: &str) -> anyhow::Result<()> {
-    let torrent = decode_torrent_file(file_path)?;
+    let client = TorrentClient::from_torrent_file(file_path)?;
+    let torrent = client.torrent_metainfo;
     println!("Tracker URL: {}", torrent.announce);
     println!("Length: {}", torrent.info.length);
     println!("Info Hash: {}", torrent.info.hash_hex()?);
@@ -80,17 +77,18 @@ fn execute_command_info(file_path: &str) -> anyhow::Result<()> {
 }
 
 async fn execute_command_peers(file_path: &str) -> anyhow::Result<()> {
-    let torrent = decode_torrent_file(file_path)?;
-    let tracker_response = tracker_get(&torrent).await?;
-    tracker_response
-        .peers()
+    let mut client = TorrentClient::from_torrent_file(file_path)?;
+    client.fetch_peers().await?;
+    client
+        .peers
         .iter()
-        .for_each(|peer| println!("{peer}"));
+        .for_each(|peer| println!("{}", peer.to_string()));
+
     Ok(())
 }
 
 async fn execute_command_handshake(file_path: &str) -> anyhow::Result<()> {
-    let mut client = TorrentClient::from_torrent_file(file_path).await?;
+    let mut client = TorrentClient::from_torrent_file(file_path)?;
     client.fetch_peers().await?;
     client.connect().await?;
     let peer_id = client.handshake().await?;
@@ -103,7 +101,7 @@ async fn execute_command_download_piece(
     // output_file_path: &str,
     piece_index: u32,
 ) -> anyhow::Result<()> {
-    let mut client = TorrentClient::from_torrent_file(input_file_path).await?;
+    let mut client = TorrentClient::from_torrent_file(input_file_path)?;
     client.fetch_peers().await?;
     client.connect().await?;
     client.handshake().await?;
