@@ -10,16 +10,18 @@ use tokio::{
 };
 
 mod error;
+mod handshake;
 mod peer_messages;
 
 use crate::{
-    handshake,
     torrent_file::{decode_torrent_file, TorrentMetainfo},
     tracker::tracker_get,
 };
 
 use self::error::Error;
 use self::peer_messages::PeerMessage;
+
+const PIECE_BLOCK_SIZE: u32 = 16_384; // 16 KiB
 
 pub struct TorrentClient {
     pub torrent_metainfo: TorrentMetainfo,
@@ -81,21 +83,21 @@ impl TorrentClient {
         Ok(())
     }
 
-    pub async fn handshake(&mut self) -> anyhow::Result<()> {
+    pub async fn handshake(&mut self) -> anyhow::Result<String> {
         let stream = self
             .stream
             .as_mut()
             .ok_or_else(|| anyhow::Error::msg(Error::TcpStreamNotAvailable.to_string()))?;
 
         let info_hash = self.torrent_metainfo.info.hash_bytes()?;
-        let _ = handshake(stream.borrow_mut(), &info_hash).await?;
-        println!("> Handshake successful");
-        Ok(())
+        let peer_id = handshake::handshake(stream.borrow_mut(), &info_hash).await?;
+        println!("> Handshake successful (peer_id: {})", peer_id);
+        Ok(peer_id)
     }
 
     pub async fn download_piece(
         &mut self,
-        // piece_index: &u8,
+        piece_index: u32,
         // output_file_path: &str,
     ) -> anyhow::Result<()> {
         let stream = self
@@ -117,11 +119,22 @@ impl TorrentClient {
                     // Send an interested message
                     Self::send_message(stream, PeerMessage::Interested).await?;
                 }
+                PeerMessage::Unchoke => {
+                    // Send a request message
+                    // TODO: Send a request message for each block of the piece
+                    Self::send_message(
+                        stream,
+                        PeerMessage::Request(piece_index, 0, PIECE_BLOCK_SIZE),
+                    )
+                    .await?;
+                }
                 _ => {}
             }
         }
     }
+}
 
+impl TorrentClient {
     async fn read_message(stream: &mut TcpStream) -> anyhow::Result<PeerMessage> {
         // Read the message size (first 4 bytes)
         let message_size = stream.read_u32().await?;

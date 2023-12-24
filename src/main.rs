@@ -1,7 +1,5 @@
 use cli::Command;
-use handshake::handshake;
 use std::env::{self};
-use tokio::net::TcpStream;
 use torrent_file::decode_torrent_file;
 use tracker::tracker_get;
 
@@ -9,7 +7,6 @@ use crate::torrent_client::TorrentClient;
 
 mod bencode;
 mod cli;
-mod handshake;
 mod torrent_client;
 mod torrent_file;
 mod tracker;
@@ -49,11 +46,8 @@ async fn main() -> anyhow::Result<()> {
             // "0"
             let input_file_path = &args[4];
             // let output_file_path = &args[3];
-            // let piece_index: &u8 = &args[5].parse().unwrap();
-            // let _ =
-            //     execute_command_download_piece(&input_file_path, &output_file_path, piece_index)
-            //         .await;
-            let _ = execute_command_download_piece(&input_file_path).await;
+            let piece_index: &u32 = &args[5].parse().unwrap();
+            let _ = execute_command_download_piece(&input_file_path, *piece_index).await;
         }
     }
 
@@ -96,15 +90,10 @@ async fn execute_command_peers(file_path: &str) -> anyhow::Result<()> {
 }
 
 async fn execute_command_handshake(file_path: &str) -> anyhow::Result<()> {
-    let torrent = decode_torrent_file(file_path)?;
-    let tracker_response = tracker_get(&torrent).await?;
-    let peers = tracker_response.peers();
-    let target_peer_address = peers.first().unwrap();
-    let info_hash = torrent.info.hash_bytes()?;
-
-    let mut stream = TcpStream::connect(target_peer_address).await?;
-    let peer_id = handshake(&mut stream, &info_hash).await?;
-
+    let mut client = TorrentClient::from_torrent_file(file_path).await?;
+    client.fetch_peers().await?;
+    client.connect().await?;
+    let peer_id = client.handshake().await?;
     println!("Peer ID: {}", peer_id);
     Ok(())
 }
@@ -112,7 +101,7 @@ async fn execute_command_handshake(file_path: &str) -> anyhow::Result<()> {
 async fn execute_command_download_piece(
     input_file_path: &str,
     // output_file_path: &str,
-    // piece_index: &u8,
+    piece_index: u32,
 ) -> anyhow::Result<()> {
     let mut client = TorrentClient::from_torrent_file(input_file_path).await?;
     client.fetch_peers().await?;
@@ -120,7 +109,7 @@ async fn execute_command_download_piece(
     client.handshake().await?;
 
     // client.download_piece(piece_index, output_file_path).await?;
-    let result = client.download_piece().await;
+    let result = client.download_piece(piece_index).await;
     if let Err(error) = result {
         eprintln!("Error downloading piece: {}", error);
     }
