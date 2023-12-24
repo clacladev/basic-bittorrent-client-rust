@@ -1,12 +1,9 @@
-use tokio::io::{self, AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpStream;
-
-struct PeerHandshakeMessage {
+pub struct HandshakeMessage {
     pub info_hash: Vec<u8>,
     pub peer_id: String,
 }
 
-impl PeerHandshakeMessage {
+impl HandshakeMessage {
     pub fn new(info_hash: Vec<u8>, peer_id: String) -> Self {
         Self { info_hash, peer_id }
     }
@@ -26,23 +23,4 @@ impl PeerHandshakeMessage {
         message[48..68].copy_from_slice(self.peer_id.as_bytes()); // The next 20 bytes are the peer id
         return message;
     }
-}
-
-// Perform an handshake with a peer and receives back a peer ID
-pub async fn handshake(stream: &mut TcpStream, info_hash: &[u8]) -> io::Result<String> {
-    // Prepare the handshake message
-    let handshake_message =
-        PeerHandshakeMessage::new(info_hash.into(), "00112233445566778899".into());
-
-    // Send the handshake message
-    stream.write_all(&handshake_message.to_bytes()).await?;
-
-    // Receive a response
-    let mut buffer = [0; 68];
-    stream.read(&mut buffer).await?;
-
-    // Extract the peer ID from the received message
-    let handshake_reply_message = PeerHandshakeMessage::from_bytes(&buffer);
-
-    Ok(handshake_reply_message.peer_id.into())
 }

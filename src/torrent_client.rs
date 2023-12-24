@@ -1,5 +1,4 @@
 use std::{
-    borrow::BorrowMut,
     net::{IpAddr, Ipv4Addr, SocketAddr},
     str::FromStr,
 };
@@ -10,10 +9,11 @@ use tokio::{
 };
 
 mod error;
-mod handshake;
+mod handshake_message;
 mod peer_message;
 
 use crate::{
+    torrent_client::handshake_message::HandshakeMessage,
     torrent_file::{decode_torrent_file, TorrentMetainfo},
     tracker::tracker_get,
 };
@@ -21,6 +21,7 @@ use crate::{
 use self::error::Error;
 use self::peer_message::PeerMessage;
 
+const PEER_ID: &str = "00112233445566778899";
 const PIECE_BLOCK_SIZE: u32 = 16_384; // 16 KiB
 
 pub struct TorrentClient {
@@ -90,8 +91,22 @@ impl TorrentClient {
             .ok_or_else(|| anyhow::Error::msg(Error::TcpStreamNotAvailable.to_string()))?;
 
         let info_hash = self.torrent_metainfo.info.hash_bytes()?;
-        let peer_id = handshake::handshake(stream.borrow_mut(), &info_hash).await?;
-        println!("> Handshake successful (peer_id: {})", peer_id);
+
+        // Prepare the handshake message
+        let handshake_message = HandshakeMessage::new(info_hash.into(), PEER_ID.into());
+
+        // Send the handshake message
+        stream.write_all(&handshake_message.to_bytes()).await?;
+
+        // Receive a response
+        let mut buffer = [0; 68];
+        stream.read(&mut buffer).await?;
+
+        // Extract the peer ID from the received message
+        let handshake_reply_message = HandshakeMessage::from_bytes(&buffer);
+        let peer_id = handshake_reply_message.peer_id;
+
+        println!("> Handshake successful (Peer ID: {})", peer_id);
         Ok(peer_id)
     }
 
