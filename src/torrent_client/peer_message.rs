@@ -1,5 +1,11 @@
 use crate::torrent_client::error::Error;
 
+const PEER_MESSAGE_UNCHOKE_ID: u8 = 1;
+const PEER_MESSAGE_INTERESTED_ID: u8 = 2;
+const PEER_MESSAGE_BITFIELD_ID: u8 = 5;
+const PEER_MESSAGE_REQUEST_ID: u8 = 6;
+const PEER_MESSAGE_PIECE_ID: u8 = 7;
+
 #[derive(Debug)]
 pub enum PeerMessage {
     Unchoke,
@@ -12,11 +18,11 @@ pub enum PeerMessage {
 impl PeerMessage {
     pub fn id(&self) -> u8 {
         match self {
-            Self::Unchoke => 1,
-            Self::Interested => 2,
-            Self::Bitfield(_) => 5,
-            Self::Request(_, _, _) => 6,
-            Self::Piece(_, _, _) => 7,
+            Self::Unchoke => PEER_MESSAGE_UNCHOKE_ID,
+            Self::Interested => PEER_MESSAGE_INTERESTED_ID,
+            Self::Bitfield(_) => PEER_MESSAGE_BITFIELD_ID,
+            Self::Request(_, _, _) => PEER_MESSAGE_REQUEST_ID,
+            Self::Piece(_, _, _) => PEER_MESSAGE_PIECE_ID,
         }
     }
 }
@@ -24,9 +30,9 @@ impl PeerMessage {
 impl PeerMessage {
     pub fn from_bytes(id: u8, body: &[u8]) -> anyhow::Result<Self> {
         match id {
-            1 => Ok(Self::Unchoke),
-            5 => Ok(Self::Bitfield(body[0])),
-            7 => Self::get_piece_from_bytes(body),
+            PEER_MESSAGE_UNCHOKE_ID => Ok(Self::Unchoke),
+            PEER_MESSAGE_BITFIELD_ID => Ok(Self::Bitfield(body[0])),
+            PEER_MESSAGE_PIECE_ID => Self::get_piece_from_bytes(body),
             _ => Err(anyhow::Error::msg(
                 Error::PeerMessageIdNotRecognized(id).to_string(),
             )),
@@ -72,5 +78,15 @@ impl PeerMessage {
         let begin = u32::from_be_bytes(bytes[4..8].try_into()?);
         let block = bytes[8..].to_vec();
         Ok(Self::Piece(index, begin, block))
+    }
+}
+
+impl PeerMessage {
+    pub fn get_expected_message_length(id: u8, message_length_field_value: usize) -> usize {
+        match id {
+            PEER_MESSAGE_UNCHOKE_ID | PEER_MESSAGE_BITFIELD_ID => message_length_field_value - 1,
+            PEER_MESSAGE_PIECE_ID => message_length_field_value - 9,
+            _ => 0,
+        }
     }
 }

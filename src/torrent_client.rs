@@ -139,7 +139,7 @@ impl TorrentClient {
                 }
                 PeerMessage::Unchoke => {
                     // Send a request message
-                    // TODO: Send a request message for each block of the piece
+                    // TODO: Send a request message for each block of the piece (piece size / PIECE_BLOCK_SIZE)
                     Self::send_message(
                         stream,
                         PeerMessage::Request(piece_index, 0, PIECE_BLOCK_SIZE),
@@ -164,21 +164,25 @@ impl TorrentClient {
         let message_id = stream.read_u8().await?;
 
         // Read the message body if necessary (following n bytes)
-        let message_body_size = (message_size - 1) as usize;
-        let mut message_body = vec![0u8; message_body_size];
+        let mut read_body_length = 0;
+        let expected_body_length =
+            PeerMessage::get_expected_message_length(message_id, message_size as usize);
+        let mut message_body = vec![0u8; expected_body_length];
 
-        if message_body_size > 0 {
+        if expected_body_length > 0 {
             // Read the
-            let read_length = stream.read(&mut message_body).await?;
-            if message_body_size != read_length {
-                return Err(anyhow::Error::msg(
-                    Error::MessageBodyNotReadCorrect.to_string(),
-                ));
+            read_body_length = stream.read(&mut message_body).await?;
+            if expected_body_length != read_body_length {
+                eprintln!(
+                    "{}",
+                    Error::MessageBodyNotReadCorrect(expected_body_length, read_body_length)
+                        .to_string()
+                )
             }
         }
 
         // Make a peer message with the id and body read
-        PeerMessage::from_bytes(message_id, message_body.as_slice())
+        PeerMessage::from_bytes(message_id, &message_body[..read_body_length])
     }
 
     async fn send_message(stream: &mut TcpStream, message: PeerMessage) -> anyhow::Result<()> {
