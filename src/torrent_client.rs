@@ -11,7 +11,7 @@ use tokio::{
 
 mod error;
 mod handshake;
-mod peer_messages;
+mod peer_message;
 
 use crate::{
     torrent_file::{decode_torrent_file, TorrentMetainfo},
@@ -19,7 +19,7 @@ use crate::{
 };
 
 use self::error::Error;
-use self::peer_messages::PeerMessage;
+use self::peer_message::PeerMessage;
 
 const PIECE_BLOCK_SIZE: u32 = 16_384; // 16 KiB
 
