@@ -135,19 +135,22 @@ impl TorrentClient {
 
             // Actionate a message if necessary
             match message {
-                PeerMessage::Bitfield(_) => {
+                PeerMessage::Bitfield { .. } => {
                     // Send an interested message
                     Self::send_message(stream, PeerMessage::Interested).await?;
                 }
                 PeerMessage::Unchoke => {
-                    // Send a request message
-                    // TODO: Send a request message for each block of the piece (piece size / PIECE_BLOCK_SIZE)
-                    Self::send_message(
-                        stream,
-                        PeerMessage::Request(piece_index, 0, PIECE_BLOCK_SIZE), // TODO: Use the correct block size
-                    )
-                    .await?;
+                    // Send the first request message
+                    Self::send_download_piece_block_message(stream, piece_index, 0).await?;
                 }
+                PeerMessage::Piece { .. } => {
+                    break Ok(());
+                }
+                // PeerMessage::Piece { index, begin, .. } => {
+                //     // TODO: if index > total_num_pieces { save to file and close stream? }
+                //     // Send followup request messages
+                //     // Self::send_download_piece_block_message(stream, index, begin).await?;
+                // }
                 _ => {}
             }
         }
@@ -191,5 +194,22 @@ impl TorrentClient {
             println!("> Sent message: {:?}", message);
         }
         Ok(())
+    }
+
+    async fn send_download_piece_block_message(
+        stream: &mut TcpStream,
+        piece_index: u32,
+        block_index: u32,
+    ) -> anyhow::Result<()> {
+        // TODO: let message = PeerMessage::Request(piece_index, offset_begin, block_length);
+        return Self::send_message(
+            stream,
+            PeerMessage::Request {
+                index: piece_index,
+                begin: block_index * PIECE_BLOCK_SIZE,
+                length: PIECE_BLOCK_SIZE, // TODO: Use the correct block size
+            },
+        )
+        .await;
     }
 }

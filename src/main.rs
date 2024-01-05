@@ -107,5 +107,6 @@ async fn execute_command_download_piece(
         eprintln!("Error downloading piece: {}", error);
     }
 
+    println!("> Done!");
     Ok(())
 }
