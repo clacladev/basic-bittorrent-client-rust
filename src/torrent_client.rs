@@ -5,6 +5,8 @@ use std::{
     vec,
 };
 
+use hex::ToHex;
+use sha1::{Digest, Sha1};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
@@ -28,6 +30,8 @@ pub struct TorrentClient {
     pub torrent_metainfo: TorrentMetainfo,
     pub peers: Vec<SocketAddr>,
     stream: Option<TcpStream>,
+    // pieces: Vec<Vec<u8>>,
+    piece_bytes: Vec<u8>,
 }
 
 // New and from helpers
@@ -37,6 +41,7 @@ impl TorrentClient {
             torrent_metainfo,
             peers: vec![],
             stream: None,
+            piece_bytes: vec![],
         }
     }
 
@@ -120,7 +125,7 @@ impl TorrentClient {
         &mut self,
         piece_index: u32,
         // output_file_path: &str,
-    ) -> anyhow::Result<Vec<u8>> {
+    ) -> anyhow::Result<()> {
         let stream = self
             .stream
             .as_mut()
@@ -145,24 +150,23 @@ impl TorrentClient {
                 }
                 PeerMessage::Unchoke => {
                     // Send the first request message
-                    Self::send_download_piece_block_message(
-                        stream,
-                        piece_index,
-                        0,
-                        self.torrent_metainfo.info.piece_length,
-                    )
-                    .await?;
+                    Self::send_download_piece_block_message(stream, piece_index, 0, piece_length)
+                        .await?;
                 }
                 PeerMessage::Piece { begin, block, .. } => {
-                    // TODO: verify the piece hash against torrent_metainfo.info.pieces_hashes()[index]
-
                     // Append the block's bytes to the already downloaded bytes
                     piece_bytes.extend(block.clone());
 
                     // If it has downloaded all blocks in the piece, break the loop and end
                     let begin_offset = begin as usize + block.len();
-                    if begin_offset >= self.torrent_metainfo.info.piece_length {
-                        break Ok(piece_bytes);
+                    if begin_offset >= piece_length {
+                        // Save the piece bytes
+                        self.piece_bytes = piece_bytes;
+                        // Verify the piece
+                        self.verify_piece(piece_index)?;
+                        // TODO: save to disk
+                        // Finished
+                        break Ok(());
                     }
 
                     // Send followup request messages
@@ -170,7 +174,7 @@ impl TorrentClient {
                         stream,
                         piece_index,
                         begin_offset as u32,
-                        self.torrent_metainfo.info.piece_length,
+                        piece_length,
                     )
                     .await?;
                 }
@@ -241,5 +245,22 @@ impl TorrentClient {
             },
         )
         .await;
+    }
+
+    fn verify_piece(&self, piece_index: u32) -> anyhow::Result<()> {
+        // TODO: let piece_bytes = self.pieces[piece_index as usize];
+
+        let mut hasher = Sha1::new();
+        hasher.update(self.piece_bytes.clone());
+        let piece_hash: String = hasher.finalize().encode_hex::<String>();
+
+        let metainfo_piece_hash =
+            self.torrent_metainfo.info.pieces_hashes()?[piece_index as usize].clone();
+
+        if piece_hash != metainfo_piece_hash {
+            return Err(anyhow::Error::msg(Error::PieceHashNotValid));
+        }
+
+        Ok(())
     }
 }

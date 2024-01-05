@@ -102,11 +102,8 @@ async fn execute_command_download_piece(
     client.handshake().await?;
 
     let result = client.download_piece(piece_index).await;
-    match result {
-        Ok(piece_bytes) => {
-            println!("> Downloaded piece length: {}", piece_bytes.len());
-        }
-        Err(error) => eprintln!("Error downloading piece: {}", error),
+    if let Err(error) = result {
+        eprintln!("Error downloading piece: {}", error);
     }
 
     println!("> Done!");

@@ -7,6 +7,7 @@ pub enum Error {
     PeerClosedConnection,
     MessageBodyNotReadCorrect(usize, usize),
     PeerMessageIdNotRecognized(u8),
+    PieceHashNotValid,
 }
 
 impl fmt::Display for Error {
@@ -27,6 +28,7 @@ impl Error {
             Self::PeerMessageIdNotRecognized(id) => {
                 format!("Peer message id '{}' not recognized", id)
             }
+            Self::PieceHashNotValid => "Piece hash not valid".into(),
         }
     }
 }
