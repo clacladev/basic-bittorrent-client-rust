@@ -1,4 +1,5 @@
 pub enum Error {
+    NoPeerAvailable,
     TcpStreamNotAvailable,
     PeerClosedConnection,
     MessageBodyNotReadCorrect(usize, usize),
@@ -8,6 +9,7 @@ pub enum Error {
 impl Error {
     pub fn to_string(&self) -> String {
         match self {
+            Self::NoPeerAvailable => "No peer available".to_string(),
             Self::TcpStreamNotAvailable => "Tcp stream not available".to_string(),
             Self::PeerClosedConnection => "Peer has closed connection".to_string(),
             Self::MessageBodyNotReadCorrect(expected, actual) => format!(

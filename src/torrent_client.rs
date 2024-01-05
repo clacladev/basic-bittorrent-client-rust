@@ -81,8 +81,10 @@ impl TorrentClient {
 // Peer connection related
 impl TorrentClient {
     pub async fn connect(&mut self) -> anyhow::Result<()> {
-        let peer = self.peers.first().unwrap();
-        self.stream = Some(TcpStream::connect(peer).await?);
+        let Some(peer_socket_address) = self.peers.first() else {
+            return Err(anyhow::Error::msg(Error::NoPeerAvailable.to_string()));
+        };
+        self.stream = Some(TcpStream::connect(peer_socket_address).await?);
         println!("> Connected");
         Ok(())
     }

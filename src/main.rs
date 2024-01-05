@@ -14,12 +14,11 @@ async fn main() -> anyhow::Result<()> {
     let command_str = &args[1];
 
     let command = Command::from_str(command_str);
-    if let None = command {
+    let Some(command) = command else {
         println!("Unknown command: {}", args[1]);
         return Ok(());
-    }
+    };
 
-    let command = command.unwrap();
     match command {
         Command::Decode => {
             let _ = execute_command_decode(&args[2]);
