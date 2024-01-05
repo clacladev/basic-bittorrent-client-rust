@@ -2,6 +2,7 @@ use std::{
     fs,
     net::{IpAddr, Ipv4Addr, SocketAddr},
     str::FromStr,
+    vec,
 };
 
 use tokio::{
@@ -119,11 +120,14 @@ impl TorrentClient {
         &mut self,
         piece_index: u32,
         // output_file_path: &str,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<Vec<u8>> {
         let stream = self
             .stream
             .as_mut()
             .ok_or_else(|| anyhow::Error::msg(Error::TcpStreamNotAvailable))?;
+
+        let piece_length = self.torrent_metainfo.info.piece_length;
+        let mut piece_bytes: Vec<u8> = Vec::with_capacity(piece_length);
 
         loop {
             // Wait for the stream to be available
@@ -141,16 +145,35 @@ impl TorrentClient {
                 }
                 PeerMessage::Unchoke => {
                     // Send the first request message
-                    Self::send_download_piece_block_message(stream, piece_index, 0).await?;
+                    Self::send_download_piece_block_message(
+                        stream,
+                        piece_index,
+                        0,
+                        self.torrent_metainfo.info.piece_length,
+                    )
+                    .await?;
                 }
-                PeerMessage::Piece { .. } => {
-                    break Ok(());
+                PeerMessage::Piece { begin, block, .. } => {
+                    // TODO: verify the piece hash against torrent_metainfo.info.pieces_hashes()[index]
+
+                    // Append the block's bytes to the already downloaded bytes
+                    piece_bytes.extend(block.clone());
+
+                    // If it has downloaded all blocks in the piece, break the loop and end
+                    let begin_offset = begin as usize + block.len();
+                    if begin_offset >= self.torrent_metainfo.info.piece_length {
+                        break Ok(piece_bytes);
+                    }
+
+                    // Send followup request messages
+                    Self::send_download_piece_block_message(
+                        stream,
+                        piece_index,
+                        begin_offset as u32,
+                        self.torrent_metainfo.info.piece_length,
+                    )
+                    .await?;
                 }
-                // PeerMessage::Piece { index, begin, .. } => {
-                //     // TODO: if index > total_num_pieces { save to file and close stream? }
-                //     // Send followup request messages
-                //     // Self::send_download_piece_block_message(stream, index, begin).await?;
-                // }
                 _ => {}
             }
         }
@@ -199,15 +222,22 @@ impl TorrentClient {
     async fn send_download_piece_block_message(
         stream: &mut TcpStream,
         piece_index: u32,
-        block_index: u32,
+        begin_offset: u32,
+        piece_length: usize,
     ) -> anyhow::Result<()> {
-        // TODO: let message = PeerMessage::Request(piece_index, offset_begin, block_length);
+        let next_block_length = (piece_length as u32) - begin_offset;
+        let next_block_length = if next_block_length > PIECE_BLOCK_SIZE {
+            PIECE_BLOCK_SIZE
+        } else {
+            next_block_length
+        };
+
         return Self::send_message(
             stream,
             PeerMessage::Request {
                 index: piece_index,
-                begin: block_index * PIECE_BLOCK_SIZE,
-                length: PIECE_BLOCK_SIZE, // TODO: Use the correct block size
+                begin: begin_offset,
+                length: next_block_length,
             },
         )
         .await;
