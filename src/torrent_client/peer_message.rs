@@ -82,8 +82,9 @@ impl PeerMessage {
 impl PeerMessage {
     pub fn get_expected_message_length(id: u8, message_length_field_value: usize) -> usize {
         match id {
-            PEER_MESSAGE_UNCHOKE_ID | PEER_MESSAGE_BITFIELD_ID => message_length_field_value - 1,
-            PEER_MESSAGE_PIECE_ID => message_length_field_value - 9,
+            PEER_MESSAGE_UNCHOKE_ID | PEER_MESSAGE_BITFIELD_ID | PEER_MESSAGE_PIECE_ID => {
+                message_length_field_value - 1
+            }
             _ => 0,
         }
     }

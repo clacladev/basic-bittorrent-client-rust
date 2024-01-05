@@ -144,7 +144,7 @@ impl TorrentClient {
                     // TODO: Send a request message for each block of the piece (piece size / PIECE_BLOCK_SIZE)
                     Self::send_message(
                         stream,
-                        PeerMessage::Request(piece_index, 0, PIECE_BLOCK_SIZE),
+                        PeerMessage::Request(piece_index, 0, PIECE_BLOCK_SIZE), // TODO: Use the correct block size
                     )
                     .await?;
                 }
@@ -165,15 +165,14 @@ impl TorrentClient {
         // Read the message id (following 1 byte)
         let message_id = stream.read_u8().await?;
 
-        // Read the message body if necessary (following n bytes)
-        let mut read_body_length = 0;
+        // Define the expected body length
         let expected_body_length =
             PeerMessage::get_expected_message_length(message_id, message_size as usize);
         let mut message_body = vec![0u8; expected_body_length];
 
         if expected_body_length > 0 {
-            // Read the
-            read_body_length = stream.read(&mut message_body).await?;
+            // Read the message body
+            let read_body_length = stream.read_exact(&mut message_body).await?;
             if expected_body_length != read_body_length {
                 eprintln!(
                     "{}",
@@ -182,8 +181,8 @@ impl TorrentClient {
             }
         }
 
-        // Make a peer message with the id and body read
-        PeerMessage::from_bytes(message_id, &message_body[..read_body_length])
+        // Return a peer message with the id and body read
+        PeerMessage::from_bytes(message_id, &message_body)
     }
 
     async fn send_message(stream: &mut TcpStream, message: PeerMessage) -> anyhow::Result<()> {
