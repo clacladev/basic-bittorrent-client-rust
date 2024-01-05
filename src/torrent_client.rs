@@ -82,7 +82,7 @@ impl TorrentClient {
 impl TorrentClient {
     pub async fn connect(&mut self) -> anyhow::Result<()> {
         let Some(peer_socket_address) = self.peers.first() else {
-            return Err(anyhow::Error::msg(Error::NoPeerAvailable.to_string()));
+            return Err(anyhow::Error::msg(Error::NoPeerAvailable));
         };
         self.stream = Some(TcpStream::connect(peer_socket_address).await?);
         println!("> Connected");
@@ -93,7 +93,7 @@ impl TorrentClient {
         let stream = self
             .stream
             .as_mut()
-            .ok_or_else(|| anyhow::Error::msg(Error::TcpStreamNotAvailable.to_string()))?;
+            .ok_or_else(|| anyhow::Error::msg(Error::TcpStreamNotAvailable))?;
 
         let info_hash = self.torrent_metainfo.info.hash_bytes()?;
 
@@ -123,7 +123,7 @@ impl TorrentClient {
         let stream = self
             .stream
             .as_mut()
-            .ok_or_else(|| anyhow::Error::msg(Error::TcpStreamNotAvailable.to_string()))?;
+            .ok_or_else(|| anyhow::Error::msg(Error::TcpStreamNotAvailable))?;
 
         loop {
             // Wait for the stream to be available
@@ -159,7 +159,7 @@ impl TorrentClient {
         // Read the message size (first 4 bytes)
         let message_size = stream.read_u32().await?;
         if message_size == 0 {
-            return Err(anyhow::Error::msg(Error::PeerClosedConnection.to_string()));
+            return Err(anyhow::Error::msg(Error::PeerClosedConnection));
         }
 
         // Read the message id (following 1 byte)
@@ -178,7 +178,6 @@ impl TorrentClient {
                 eprintln!(
                     "{}",
                     Error::MessageBodyNotReadCorrect(expected_body_length, read_body_length)
-                        .to_string()
                 )
             }
         }

@@ -78,11 +78,7 @@ fn execute_command_info(file_path: &str) -> anyhow::Result<()> {
 async fn execute_command_peers(file_path: &str) -> anyhow::Result<()> {
     let mut client = TorrentClient::from_torrent_file(file_path)?;
     client.fetch_peers().await?;
-    client
-        .peers
-        .iter()
-        .for_each(|peer| println!("{}", peer.to_string()));
-
+    client.peers.iter().for_each(|peer| println!("{}", peer));
     Ok(())
 }
 
