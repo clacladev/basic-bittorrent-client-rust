@@ -1,3 +1,5 @@
+use std::fmt::{Display, Formatter, Result};
+
 use crate::torrent_client::error::Error;
 
 const PEER_MESSAGE_UNCHOKE_ID: u8 = 1;
@@ -23,6 +25,30 @@ pub enum PeerMessage {
         begin: u32,
         block: Vec<u8>,
     },
+}
+
+impl Display for PeerMessage {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        match self {
+            PeerMessage::Unchoke
+            | PeerMessage::Interested
+            | PeerMessage::Bitfield { .. }
+            | PeerMessage::Request { .. } => {
+                write!(f, "{:?}", self)
+            }
+            PeerMessage::Piece {
+                index,
+                begin,
+                block,
+            } => write!(
+                f,
+                "Piece (index: {}, begin: {}, block length: {})",
+                index,
+                begin,
+                block.len()
+            ),
+        }
+    }
 }
 
 impl PeerMessage {

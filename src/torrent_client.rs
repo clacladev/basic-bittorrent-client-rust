@@ -131,7 +131,7 @@ impl TorrentClient {
 
             // Read a message
             let message = Self::read_message(stream).await?;
-            println!("> Received message: {:?}", message);
+            println!("> Received message: {}", message);
 
             // Actionate a message if necessary
             match message {
