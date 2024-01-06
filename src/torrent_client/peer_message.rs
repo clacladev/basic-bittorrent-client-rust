@@ -69,7 +69,7 @@ impl PeerMessage {
             PEER_MESSAGE_UNCHOKE_ID => Ok(Self::Unchoke),
             PEER_MESSAGE_BITFIELD_ID => Ok(Self::Bitfield { bitfield: body[0] }),
             PEER_MESSAGE_PIECE_ID => Self::get_piece_from_bytes(body),
-            _ => Err(anyhow::Error::msg(Error::PeerMessageIdNotRecognized(id))),
+            _ => Err(anyhow::Error::msg(Error::PeerMessageIdNotRecognized { id })),
         }
     }
 

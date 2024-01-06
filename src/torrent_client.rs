@@ -164,6 +164,7 @@ impl TorrentClient {
                     Self::send_download_piece_block_message(stream, piece_index, 0, piece_length)
                         .await?;
                 }
+                // [your_program] > Piece length: 262144
                 // [your_program] > Received message: Unchoke
                 // [your_program] > Sent message: Request { index: 11, begin: 0, length: 16384 }
                 // [your_program] > Received message: Piece (index: 11, begin: 0, block length: 16384)
@@ -241,7 +242,10 @@ impl TorrentClient {
             if expected_body_length != read_body_length {
                 eprintln!(
                     "{}",
-                    Error::MessageBodyNotReadCorrect(expected_body_length, read_body_length)
+                    Error::MessageBodyNotReadCorrect {
+                        expected: expected_body_length,
+                        actual: read_body_length
+                    }
                 )
             }
         }
@@ -271,7 +275,7 @@ impl TorrentClient {
             next_block_length
         };
 
-        return Self::send_message(
+        let result = Self::send_message(
             stream,
             PeerMessage::Request {
                 index: piece_index,
@@ -280,6 +284,18 @@ impl TorrentClient {
             },
         )
         .await;
+
+        let Ok(_) = result else {
+            return Err(anyhow::Error::msg(
+                Error::FailedSendingDownloadPieceBlockMessage {
+                    index: piece_index,
+                    begin: begin_offset,
+                    length: next_block_length as usize,
+                },
+            ));
+        };
+
+        result
     }
 
     fn verify_piece(&self, piece_index: u32) -> anyhow::Result<()> {
