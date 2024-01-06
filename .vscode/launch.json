@@ -25,7 +25,26 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug 'download_piece -o /tmp/test-piece-0 sample.torrent 0'",
+      "name": "Debug unit tests in executable 'bittorrent-starter-rust'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--bin=bittorrent-starter-rust",
+          "--package=bittorrent-starter-rust"
+        ],
+        "filter": {
+          "name": "bittorrent-starter-rust",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug './your_bittorrent.sh download_piece -o /tmp/test-piece-0 sample.torrent 0'",
       "cargo": {
         "args": [
           "build",
@@ -49,11 +68,10 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug unit tests in executable 'bittorrent-starter-rust'",
+      "name": "Debug './your_bittorrent.sh download_piece -o /tmp/torrents2850430343/piece-2 /tmp/torrents2850430343/congratulations.gif.torrent 2'",
       "cargo": {
         "args": [
-          "test",
-          "--no-run",
+          "build",
           "--bin=bittorrent-starter-rust",
           "--package=bittorrent-starter-rust"
         ],
@@ -62,7 +80,37 @@
           "kind": "bin"
         }
       },
-      "args": [],
+      "args": [
+        "download_piece",
+        "-o",
+        "/tmp/torrents2850430343/piece-2",
+        "/tmp/torrents2850430343/congratulations.gif.torrent",
+        "2"
+      ],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug './your_bittorrent.sh download_piece -o /tmp/torrents2850430343/piece-3 /tmp/torrents2850430343/congratulations.gif.torrent 3'",
+      "cargo": {
+        "args": [
+          "build",
+          "--bin=bittorrent-starter-rust",
+          "--package=bittorrent-starter-rust"
+        ],
+        "filter": {
+          "name": "bittorrent-starter-rust",
+          "kind": "bin"
+        }
+      },
+      "args": [
+        "download_piece",
+        "-o",
+        "/tmp/torrents2850430343/piece-3",
+        "/tmp/torrents2850430343/congratulations.gif.torrent",
+        "3"
+      ],
       "cwd": "${workspaceFolder}"
     }
   ]

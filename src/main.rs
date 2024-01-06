@@ -42,9 +42,13 @@ async fn main() -> anyhow::Result<()> {
             let input_file_path = &args[4];
             let output_file_path = &args[3];
             let piece_index: &u32 = &args[5].parse()?;
-            let _ =
+
+            let result =
                 execute_command_download_piece(&input_file_path, &output_file_path, *piece_index)
                     .await;
+            if let Err(error) = result {
+                eprintln!("Error: {}", error);
+            };
         }
     }
 

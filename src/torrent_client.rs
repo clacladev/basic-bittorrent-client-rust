@@ -10,7 +10,6 @@ use sha1::{Digest, Sha1};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
-    stream,
 };
 
 mod error;
@@ -138,7 +137,7 @@ impl TorrentClient {
     pub async fn download_piece(
         &mut self,
         piece_index: u32,
-        _output_file_path: &str,
+        output_file_path: &str,
     ) -> anyhow::Result<()> {
         let stream = self
             .stream
@@ -176,15 +175,16 @@ impl TorrentClient {
                     if begin_offset >= piece_length {
                         // Save the piece bytes
                         self.pieces.resize(piece_index as usize + 1, vec![]);
-                        self.pieces[piece_index as usize] = piece_bytes;
+                        self.pieces[piece_index as usize] = piece_bytes.clone();
 
                         // Verify the piece
                         self.verify_piece(piece_index)?;
 
                         // Save the piece to disk
-                        // std::fs::write(&output, downloaded_payload).unwrap();
-                        // let output_str = output.to_str().unwrap();
-                        // println!("Piece {} downloaded to {}.", piece_index, output_str);
+                        let Ok(_) = std::fs::write(&output_file_path, piece_bytes) else {
+                            return Err(anyhow::Error::msg(Error::PieceNotSaved));
+                        };
+                        println!("> Piece {} downloaded to {}", piece_index, output_file_path);
 
                         // Finished
                         break Ok(());
