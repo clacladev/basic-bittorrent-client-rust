@@ -81,16 +81,13 @@ impl TorrentClient {
 
         Ok(())
     }
-}
 
-// Peer connection related
-impl TorrentClient {
     pub async fn connect(&mut self) -> anyhow::Result<()> {
         let Some(peer_socket_address) = self.peers.first() else {
             return Err(anyhow::Error::msg(Error::NoPeerAvailable));
         };
         self.stream = Some(TcpStream::connect(peer_socket_address).await?);
-        println!("> Connected");
+        // println!("> Connected");
         Ok(())
     }
 
@@ -104,7 +101,7 @@ impl TorrentClient {
         stream.shutdown().await?;
         self.stream = None;
 
-        println!("> Disconnected");
+        // println!("> Disconnected");
         Ok(())
     }
 
@@ -130,7 +127,7 @@ impl TorrentClient {
         let handshake_reply_message = HandshakeMessage::from_bytes(&buffer);
         let peer_id = handshake_reply_message.peer_id;
 
-        println!("> Handshake successful (Peer ID: {})", peer_id);
+        // println!("> Handshake successful (Peer ID: {})", peer_id);
         Ok(peer_id)
     }
 
@@ -153,7 +150,7 @@ impl TorrentClient {
 
             // Read a message
             let message = Self::read_message(stream).await?;
-            println!("> Received message: {}", message);
+            // println!("> Received message: {}", message);
 
             // Actionate a message if necessary
             match message {
@@ -184,7 +181,7 @@ impl TorrentClient {
                         let Ok(_) = std::fs::write(&output_file_path, piece_bytes) else {
                             return Err(anyhow::Error::msg(Error::PieceNotSaved));
                         };
-                        println!("> Piece {} downloaded to {}", piece_index, output_file_path);
+                        println!("Piece {} downloaded to {}.", piece_index, output_file_path);
 
                         // Finished
                         break Ok(());
@@ -205,6 +202,7 @@ impl TorrentClient {
     }
 }
 
+// Helpers
 impl TorrentClient {
     async fn read_message(stream: &mut TcpStream) -> anyhow::Result<PeerMessage> {
         // Read the message size (first 4 bytes)
@@ -239,7 +237,7 @@ impl TorrentClient {
     async fn send_message(stream: &mut TcpStream, message: PeerMessage) -> anyhow::Result<()> {
         if let Some(message_bytes) = message.to_bytes() {
             stream.write_all(&message_bytes).await?;
-            println!("> Sent message: {:?}", message);
+            // println!("> Sent message: {:?}", message);
         }
         Ok(())
     }
