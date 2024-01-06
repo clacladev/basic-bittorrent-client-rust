@@ -109,7 +109,7 @@ async fn execute_command_download_piece(
 
     let result = client.download_piece(piece_index, output_file_path).await;
     if let Err(error) = result {
-        println!("Error downloading piece: {}", error);
+        println!("Error: \"{}\"", error);
     }
 
     client.disconnect().await?;

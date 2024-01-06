@@ -68,7 +68,7 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug './your_bittorrent.sh download_piece -o /tmp/torrents2850430343/piece-2 /tmp/torrents2850430343/congratulations.gif.torrent 2'",
+      "name": "Debug './your_bittorrent.sh download_piece -o /tmp/torrents2671598290/piece-0 /tmp/torrents2671598290/itsworking.gif.torrent 0'",
       "cargo": {
         "args": [
           "build",
@@ -83,9 +83,9 @@
       "args": [
         "download_piece",
         "-o",
-        "/tmp/torrents2850430343/piece-2",
-        "/tmp/torrents2850430343/congratulations.gif.torrent",
-        "2"
+        "/tmp/torrents2671598290/piece-0",
+        "/tmp/torrents2671598290/itsworking.gif.torrent",
+        "0"
       ],
       "cwd": "${workspaceFolder}"
     },
@@ -109,7 +109,7 @@
         "-o",
         "/tmp/torrents837410274/piece-9",
         "/tmp/torrents837410274/itsworking.gif.torrent",
-        "3"
+        "9"
       ],
       "cwd": "${workspaceFolder}"
     }

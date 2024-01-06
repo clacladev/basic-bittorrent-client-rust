@@ -88,7 +88,7 @@ impl TorrentClient {
             return Err(anyhow::Error::msg(Error::NoPeerAvailable));
         };
         self.stream = Some(TcpStream::connect(peer_socket_address).await?);
-        println!("> Connected");
+        println!("> Connected to {}", peer_socket_address);
         Ok(())
     }
 
@@ -154,7 +154,7 @@ impl TorrentClient {
             let message = Self::read_message(stream).await?;
             println!("> Received message: {}", message);
 
-            // Actionate a message if necessary
+            // Actionate a received message if necessary
             match message {
                 PeerMessage::Bitfield { .. } => {
                     // Send an interested message
@@ -165,22 +165,6 @@ impl TorrentClient {
                     Self::send_download_piece_block_message(stream, piece_index, 0, piece_length)
                         .await?;
                 }
-                // [your_program] > Piece length: 262144
-                // [your_program] > Received message: Unchoke
-                // [your_program] > Sent message: Request { index: 11, begin: 0, length: 16384 }
-                // [your_program] > Received message: Piece (index: 11, begin: 0, block length: 16384)
-                // [your_program] > Sent message: Request { index: 11, begin: 16384, length: 16384 }
-                // [your_program] > Received message: Piece (index: 11, begin: 16384, block length: 16384)
-                // [your_program] > Sent message: Request { index: 11, begin: 32768, length: 16384 }
-                // [your_program] > Received message: Piece (index: 11, begin: 32768, block length: 16384)
-                // [your_program] > Sent message: Request { index: 11, begin: 49152, length: 16384 }
-                // [your_program] > Received message: Piece (index: 11, begin: 49152, block length: 16384)
-                // [your_program] > Sent message: Request { index: 11, begin: 65536, length: 16384 }
-                // [your_program] > Received message: Piece (index: 11, begin: 65536, block length: 16384)
-                // [your_program] > Sent message: Request { index: 11, begin: 81920, length: 16384 }
-                // [your_program] > Received message: Piece (index: 11, begin: 81920, block length: 16384)
-                // [your_program] > Sent message: Request { index: 11, begin: 98304, length: 16384 }
-                // [your_program] Error downloading piece: unexpected end of file
                 PeerMessage::Piece { begin, block, .. } => {
                     // Append the block's bytes to the already downloaded bytes
                     piece_bytes.extend(block.clone());
@@ -196,10 +180,7 @@ impl TorrentClient {
                         self.verify_piece(piece_index)?;
 
                         // Save the piece to disk
-                        let Ok(_) = std::fs::write(&output_file_path, piece_bytes) else {
-                            return Err(anyhow::Error::msg(Error::PieceNotSaved));
-                        };
-                        println!("Piece {} downloaded to {}.", piece_index, output_file_path);
+                        std::fs::write(&output_file_path, piece_bytes)?;
 
                         // Finished
                         break Ok(());

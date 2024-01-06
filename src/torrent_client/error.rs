@@ -8,7 +8,6 @@ pub enum Error {
     MessageBodyNotReadCorrect { expected: usize, actual: usize },
     PeerMessageIdNotRecognized { id: u8 },
     PieceHashNotValid,
-    PieceNotSaved,
 }
 
 impl fmt::Display for Error {
@@ -30,7 +29,6 @@ impl Error {
                 format!("Peer message id '{}' not recognized", id)
             }
             Self::PieceHashNotValid => "Piece hash not valid".into(),
-            Self::PieceNotSaved => "Piece not saved".into(),
         }
     }
 }
