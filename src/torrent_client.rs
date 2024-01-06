@@ -143,6 +143,7 @@ impl TorrentClient {
 
         let piece_length = self.torrent_metainfo.info.piece_length;
         let mut piece_bytes: Vec<u8> = Vec::with_capacity(piece_length);
+        println!("> Piece length: {}", piece_length);
 
         loop {
             // Wait for the stream to be available
@@ -163,6 +164,21 @@ impl TorrentClient {
                     Self::send_download_piece_block_message(stream, piece_index, 0, piece_length)
                         .await?;
                 }
+                // [your_program] > Received message: Unchoke
+                // [your_program] > Sent message: Request { index: 11, begin: 0, length: 16384 }
+                // [your_program] > Received message: Piece (index: 11, begin: 0, block length: 16384)
+                // [your_program] > Sent message: Request { index: 11, begin: 16384, length: 16384 }
+                // [your_program] > Received message: Piece (index: 11, begin: 16384, block length: 16384)
+                // [your_program] > Sent message: Request { index: 11, begin: 32768, length: 16384 }
+                // [your_program] > Received message: Piece (index: 11, begin: 32768, block length: 16384)
+                // [your_program] > Sent message: Request { index: 11, begin: 49152, length: 16384 }
+                // [your_program] > Received message: Piece (index: 11, begin: 49152, block length: 16384)
+                // [your_program] > Sent message: Request { index: 11, begin: 65536, length: 16384 }
+                // [your_program] > Received message: Piece (index: 11, begin: 65536, block length: 16384)
+                // [your_program] > Sent message: Request { index: 11, begin: 81920, length: 16384 }
+                // [your_program] > Received message: Piece (index: 11, begin: 81920, block length: 16384)
+                // [your_program] > Sent message: Request { index: 11, begin: 98304, length: 16384 }
+                // [your_program] Error downloading piece: unexpected end of file
                 PeerMessage::Piece { begin, block, .. } => {
                     // Append the block's bytes to the already downloaded bytes
                     piece_bytes.extend(block.clone());
