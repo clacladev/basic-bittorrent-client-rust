@@ -30,8 +30,7 @@ pub struct TorrentClient {
     pub torrent_metainfo: TorrentMetainfo,
     pub peers: Vec<SocketAddr>,
     stream: Option<TcpStream>,
-    // pieces: Vec<Vec<u8>>,
-    piece_bytes: Vec<u8>,
+    pieces: Vec<Vec<u8>>,
 }
 
 // New and from helpers
@@ -41,7 +40,7 @@ impl TorrentClient {
             torrent_metainfo,
             peers: vec![],
             stream: None,
-            piece_bytes: vec![],
+            pieces: vec![],
         }
     }
 
@@ -161,10 +160,17 @@ impl TorrentClient {
                     let begin_offset = begin as usize + block.len();
                     if begin_offset >= piece_length {
                         // Save the piece bytes
-                        self.piece_bytes = piece_bytes;
+                        self.pieces.resize(piece_index as usize + 1, vec![]);
+                        self.pieces[piece_index as usize] = piece_bytes;
+
                         // Verify the piece
                         self.verify_piece(piece_index)?;
-                        // TODO: save to disk
+
+                        // Save the piece to disk
+                        // std::fs::write(&output, downloaded_payload).unwrap();
+                        // let output_str = output.to_str().unwrap();
+                        // println!("Piece {} downloaded to {}.", piece_index, output_str);
+
                         // Finished
                         break Ok(());
                     }
@@ -248,10 +254,10 @@ impl TorrentClient {
     }
 
     fn verify_piece(&self, piece_index: u32) -> anyhow::Result<()> {
-        // TODO: let piece_bytes = self.pieces[piece_index as usize];
+        let piece_bytes = &self.pieces[piece_index as usize];
 
         let mut hasher = Sha1::new();
-        hasher.update(self.piece_bytes.clone());
+        hasher.update(piece_bytes);
         let piece_hash: String = hasher.finalize().encode_hex::<String>();
 
         let metainfo_piece_hash =
