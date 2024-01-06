@@ -47,6 +47,7 @@ impl TorrentClient {
     pub fn from_torrent_file(file_path: &str) -> anyhow::Result<Self> {
         let content = fs::read(file_path)?;
         let torrent_metainfo: TorrentMetainfo = serde_bencode::from_bytes(&content)?;
+        println!("> Torrent metainfo: {:?}", torrent_metainfo);
         Ok(Self::new(torrent_metainfo))
     }
 }
@@ -275,7 +276,7 @@ impl TorrentClient {
             next_block_length
         };
 
-        let result = Self::send_message(
+        Self::send_message(
             stream,
             PeerMessage::Request {
                 index: piece_index,
@@ -283,19 +284,7 @@ impl TorrentClient {
                 length: next_block_length,
             },
         )
-        .await;
-
-        let Ok(_) = result else {
-            return Err(anyhow::Error::msg(
-                Error::FailedSendingDownloadPieceBlockMessage {
-                    index: piece_index,
-                    begin: begin_offset,
-                    length: next_block_length as usize,
-                },
-            ));
-        };
-
-        result
+        .await
     }
 
     fn verify_piece(&self, piece_index: u32) -> anyhow::Result<()> {

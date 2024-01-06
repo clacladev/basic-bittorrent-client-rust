@@ -5,20 +5,10 @@ pub enum Error {
     NoPeerAvailable,
     TcpStreamNotAvailable,
     PeerClosedConnection,
-    MessageBodyNotReadCorrect {
-        expected: usize,
-        actual: usize,
-    },
-    PeerMessageIdNotRecognized {
-        id: u8,
-    },
+    MessageBodyNotReadCorrect { expected: usize, actual: usize },
+    PeerMessageIdNotRecognized { id: u8 },
     PieceHashNotValid,
     PieceNotSaved,
-    FailedSendingDownloadPieceBlockMessage {
-        index: u32,
-        begin: u32,
-        length: usize,
-    },
 }
 
 impl fmt::Display for Error {
@@ -41,14 +31,6 @@ impl Error {
             }
             Self::PieceHashNotValid => "Piece hash not valid".into(),
             Self::PieceNotSaved => "Piece not saved".into(),
-            Self::FailedSendingDownloadPieceBlockMessage {
-                index,
-                begin,
-                length,
-            } => format!(
-                "Failed sending download piece block message for piece index {}, begin offset {}, block length {}",
-                index, begin, length
-            ),
         }
     }
 }
