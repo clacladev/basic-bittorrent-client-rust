@@ -10,6 +10,7 @@ use sha1::{Digest, Sha1};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
+    stream,
 };
 
 mod error;
@@ -94,6 +95,20 @@ impl TorrentClient {
         Ok(())
     }
 
+    pub async fn disconnect(&mut self) -> anyhow::Result<()> {
+        let stream = self
+            .stream
+            .as_mut()
+            .ok_or_else(|| anyhow::Error::msg(Error::TcpStreamNotAvailable))?;
+
+        stream.flush().await?;
+        stream.shutdown().await?;
+        self.stream = None;
+
+        println!("> Disconnected");
+        Ok(())
+    }
+
     pub async fn handshake(&mut self) -> anyhow::Result<String> {
         let stream = self
             .stream
@@ -123,7 +138,7 @@ impl TorrentClient {
     pub async fn download_piece(
         &mut self,
         piece_index: u32,
-        // output_file_path: &str,
+        _output_file_path: &str,
     ) -> anyhow::Result<()> {
         let stream = self
             .stream

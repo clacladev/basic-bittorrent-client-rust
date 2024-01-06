@@ -40,9 +40,11 @@ async fn main() -> anyhow::Result<()> {
             // "sample.torrent",
             // "0"
             let input_file_path = &args[4];
-            // let output_file_path = &args[3];
-            let piece_index: &u32 = &args[5].parse().unwrap();
-            let _ = execute_command_download_piece(&input_file_path, *piece_index).await;
+            let output_file_path = &args[3];
+            let piece_index: &u32 = &args[5].parse()?;
+            let _ =
+                execute_command_download_piece(&input_file_path, &output_file_path, *piece_index)
+                    .await;
         }
     }
 
@@ -93,7 +95,7 @@ async fn execute_command_handshake(file_path: &str) -> anyhow::Result<()> {
 
 async fn execute_command_download_piece(
     input_file_path: &str,
-    // output_file_path: &str,
+    output_file_path: &str,
     piece_index: u32,
 ) -> anyhow::Result<()> {
     let mut client = TorrentClient::from_torrent_file(input_file_path)?;
@@ -101,11 +103,11 @@ async fn execute_command_download_piece(
     client.connect().await?;
     client.handshake().await?;
 
-    let result = client.download_piece(piece_index).await;
+    let result = client.download_piece(piece_index, output_file_path).await;
     if let Err(error) = result {
         eprintln!("Error downloading piece: {}", error);
     }
 
-    println!("> Done!");
+    client.disconnect().await?;
     Ok(())
 }
