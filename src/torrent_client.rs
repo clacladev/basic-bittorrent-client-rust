@@ -87,7 +87,7 @@ impl TorrentClient {
             return Err(anyhow::Error::msg(Error::NoPeerAvailable));
         };
         self.stream = Some(TcpStream::connect(peer_socket_address).await?);
-        // println!("> Connected");
+        println!("> Connected");
         Ok(())
     }
 
@@ -101,7 +101,7 @@ impl TorrentClient {
         stream.shutdown().await?;
         self.stream = None;
 
-        // println!("> Disconnected");
+        println!("> Disconnected");
         Ok(())
     }
 
@@ -127,7 +127,7 @@ impl TorrentClient {
         let handshake_reply_message = HandshakeMessage::from_bytes(&buffer);
         let peer_id = handshake_reply_message.peer_id;
 
-        // println!("> Handshake successful (Peer ID: {})", peer_id);
+        println!("> Handshake successful (Peer ID: {})", peer_id);
         Ok(peer_id)
     }
 
@@ -150,7 +150,7 @@ impl TorrentClient {
 
             // Read a message
             let message = Self::read_message(stream).await?;
-            // println!("> Received message: {}", message);
+            println!("> Received message: {}", message);
 
             // Actionate a message if necessary
             match message {
@@ -237,7 +237,7 @@ impl TorrentClient {
     async fn send_message(stream: &mut TcpStream, message: PeerMessage) -> anyhow::Result<()> {
         if let Some(message_bytes) = message.to_bytes() {
             stream.write_all(&message_bytes).await?;
-            // println!("> Sent message: {:?}", message);
+            println!("> Sent message: {:?}", message);
         }
         Ok(())
     }
