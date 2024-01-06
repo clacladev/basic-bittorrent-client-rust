@@ -240,7 +240,7 @@ impl TorrentClient {
             // Read the message body
             let read_body_length = stream.read_exact(&mut message_body).await?;
             if expected_body_length != read_body_length {
-                eprintln!(
+                println!(
                     "{}",
                     Error::MessageBodyNotReadCorrect {
                         expected: expected_body_length,

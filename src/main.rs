@@ -47,7 +47,7 @@ async fn main() -> anyhow::Result<()> {
                 execute_command_download_piece(&input_file_path, &output_file_path, *piece_index)
                     .await;
             if let Err(error) = result {
-                eprintln!("Error: {}", error);
+                println!("Error: {}", error);
             };
         }
     }
@@ -109,7 +109,7 @@ async fn execute_command_download_piece(
 
     let result = client.download_piece(piece_index, output_file_path).await;
     if let Err(error) = result {
-        eprintln!("Error downloading piece: {}", error);
+        println!("Error downloading piece: {}", error);
     }
 
     client.disconnect().await?;
