@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
 
+const PIECES_CHUNK_SIZE: usize = 20;
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TorrentMetainfo {
     pub announce: String,
@@ -46,10 +48,10 @@ impl Info {
         Ok(str)
     }
 
-    pub fn pieces_hashes(&self) -> anyhow::Result<Vec<String>> {
+    pub fn pieces_hashes(&self) -> Vec<String> {
         let hashes: Vec<String> = self
             .pieces
-            .chunks(20)
+            .chunks(PIECES_CHUNK_SIZE)
             .map(|chunk| {
                 chunk
                     .iter()
@@ -57,6 +59,10 @@ impl Info {
                     .collect::<String>()
             })
             .collect();
-        Ok(hashes)
+        hashes
+    }
+
+    pub fn pieces_count(&self) -> usize {
+        self.pieces.len() / PIECES_CHUNK_SIZE
     }
 }

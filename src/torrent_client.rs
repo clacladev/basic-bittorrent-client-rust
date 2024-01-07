@@ -47,7 +47,6 @@ impl TorrentClient {
     pub fn from_torrent_file(file_path: &str) -> anyhow::Result<Self> {
         let content = fs::read(file_path)?;
         let torrent_metainfo: TorrentMetainfo = serde_bencode::from_bytes(&content)?;
-        println!("> Torrent metainfo: {:?}", torrent_metainfo);
         Ok(Self::new(torrent_metainfo))
     }
 }
@@ -137,14 +136,15 @@ impl TorrentClient {
         piece_index: u32,
         output_file_path: &str,
     ) -> anyhow::Result<()> {
+        let piece_length = self.get_piece_length(piece_index);
+        println!("> Piece length: {}", piece_length);
+
         let stream = self
             .stream
             .as_mut()
             .ok_or_else(|| anyhow::Error::msg(Error::TcpStreamNotAvailable))?;
 
-        let piece_length = self.torrent_metainfo.info.piece_length;
         let mut piece_bytes: Vec<u8> = Vec::with_capacity(piece_length);
-        println!("> Piece length: {}", piece_length);
 
         loop {
             // Wait for the stream to be available
@@ -268,6 +268,19 @@ impl TorrentClient {
         .await
     }
 
+    fn get_piece_length(&self, piece_index: u32) -> usize {
+        let file_length = self.torrent_metainfo.info.length;
+        let piece_length = self.torrent_metainfo.info.piece_length;
+        let pieces_count = self.torrent_metainfo.info.pieces_count();
+        let piece_length = if piece_index == pieces_count as u32 - 1 {
+            // Last piece
+            file_length % piece_length as usize
+        } else {
+            piece_length
+        };
+        piece_length
+    }
+
     fn verify_piece(&self, piece_index: u32) -> anyhow::Result<()> {
         let piece_bytes = &self.pieces[piece_index as usize];
 
@@ -276,7 +289,7 @@ impl TorrentClient {
         let piece_hash: String = hasher.finalize().encode_hex::<String>();
 
         let metainfo_piece_hash =
-            self.torrent_metainfo.info.pieces_hashes()?[piece_index as usize].clone();
+            self.torrent_metainfo.info.pieces_hashes()[piece_index as usize].clone();
 
         if piece_hash != metainfo_piece_hash {
             return Err(anyhow::Error::msg(Error::PieceHashNotValid));

@@ -75,7 +75,7 @@ fn execute_command_info(file_path: &str) -> anyhow::Result<()> {
     println!("Piece Hashes:");
     torrent
         .info
-        .pieces_hashes()?
+        .pieces_hashes()
         .iter()
         .for_each(|hash| println!("{}", hash));
     Ok(())
