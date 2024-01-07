@@ -44,8 +44,36 @@ impl TorrentClient {
         }
     }
 
-    pub fn from_torrent_file(file_path: &str) -> anyhow::Result<Self> {
-        let content = fs::read(file_path)?;
+    pub fn from_torrent_file(_file_path: &str) -> anyhow::Result<Self> {
+        // let content = fs::read(file_path)?;
+
+        // Note:
+        // Hardcoded bytes of file /tmp/torrents2550026962/codercat.gif.torrent
+        let content = [
+            100, 56, 58, 97, 110, 110, 111, 117, 110, 99, 101, 53, 53, 58, 104, 116, 116, 112, 58,
+            47, 47, 98, 105, 116, 116, 111, 114, 114, 101, 110, 116, 45, 116, 101, 115, 116, 45,
+            116, 114, 97, 99, 107, 101, 114, 46, 99, 111, 100, 101, 99, 114, 97, 102, 116, 101,
+            114, 115, 46, 105, 111, 47, 97, 110, 110, 111, 117, 110, 99, 101, 49, 48, 58, 99, 114,
+            101, 97, 116, 101, 100, 32, 98, 121, 49, 51, 58, 109, 107, 116, 111, 114, 114, 101,
+            110, 116, 32, 49, 46, 49, 52, 58, 105, 110, 102, 111, 100, 54, 58, 108, 101, 110, 103,
+            116, 104, 105, 50, 53, 52, 57, 55, 48, 48, 101, 52, 58, 110, 97, 109, 101, 49, 52, 58,
+            105, 116, 115, 119, 111, 114, 107, 105, 110, 103, 46, 103, 105, 102, 49, 50, 58, 112,
+            105, 101, 99, 101, 32, 108, 101, 110, 103, 116, 104, 105, 50, 54, 50, 49, 52, 52, 101,
+            54, 58, 112, 105, 101, 99, 101, 115, 50, 48, 48, 58, 1, 204, 23, 187, 230, 15, 165,
+            165, 47, 100, 189, 95, 91, 100, 217, 146, 134, 213, 10, 165, 131, 143, 112, 60, 247,
+            246, 240, 141, 28, 73, 126, 211, 144, 223, 120, 249, 13, 95, 117, 102, 69, 191, 16,
+            151, 75, 88, 22, 73, 30, 48, 98, 139, 120, 163, 130, 202, 54, 196, 224, 95, 132, 190,
+            75, 216, 85, 179, 75, 206, 220, 12, 110, 152, 246, 109, 62, 124, 99, 53, 61, 30, 134,
+            66, 122, 201, 77, 110, 79, 33, 166, 208, 214, 200, 183, 255, 164, 195, 147, 195, 177,
+            49, 124, 112, 205, 95, 68, 209, 172, 85, 5, 203, 133, 93, 82, 108, 235, 15, 95, 28,
+            213, 227, 55, 150, 171, 5, 175, 31, 168, 116, 23, 58, 10, 108, 18, 152, 98, 90, 212,
+            123, 79, 230, 39, 42, 143, 248, 252, 134, 91, 5, 61, 151, 74, 120, 104, 20, 20, 179,
+            128, 119, 215, 177, 176, 113, 40, 211, 166, 1, 128, 98, 191, 231, 121, 219, 150, 211,
+            169, 60, 5, 251, 129, 212, 122, 255, 201, 79, 9, 133, 185, 133, 235, 136, 138, 54, 236,
+            146, 101, 40, 33, 162, 27, 228, 101, 101,
+        ];
+        println!("> Torrent metainfo file content: {:?}", content);
+
         let torrent_metainfo: TorrentMetainfo = serde_bencode::from_bytes(&content)?;
         println!("> Torrent metainfo: {:?}", torrent_metainfo);
         Ok(Self::new(torrent_metainfo))
@@ -205,6 +233,9 @@ impl TorrentClient {
 impl TorrentClient {
     async fn read_message(stream: &mut TcpStream) -> anyhow::Result<PeerMessage> {
         // Read the message size (first 4 bytes)
+        // Note:
+        // Issue is here: it fails to read the first 4 bytes.
+        // It throws an error: unexpected end of file
         let message_size = stream.read_u32().await?;
         if message_size == 0 {
             return Err(anyhow::Error::msg(Error::PeerClosedConnection));
@@ -259,11 +290,18 @@ impl TorrentClient {
 
         Self::send_message(
             stream,
+            // Note: here I hardcode the begin offset and length
+            // to fetch the problematic block. So at the first read message it will fail.
             PeerMessage::Request {
                 index: piece_index,
-                begin: begin_offset,
-                length: next_block_length,
+                begin: 180224,
+                length: 16384,
             },
+            // PeerMessage::Request {
+            //     index: piece_index,
+            //     begin: begin_offset,
+            //     length: next_block_length,
+            // },
         )
         .await
     }
