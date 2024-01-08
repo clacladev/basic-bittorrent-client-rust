@@ -33,12 +33,6 @@ async fn main() -> anyhow::Result<()> {
             let _ = execute_command_handshake(&args[2]).await;
         }
         Command::DownloadPiece => {
-            // "/tmp/codecrafters-bittorrent-target/release/bittorrent-starter-rust",
-            // "download_piece",
-            // "-o",
-            // "/tmp/test-piece-0",
-            // "sample.torrent",
-            // "0"
             let input_file_path = &args[4];
             let output_file_path = &args[3];
             let piece_index: &u32 = &args[5].parse()?;
@@ -46,6 +40,15 @@ async fn main() -> anyhow::Result<()> {
             let result =
                 execute_command_download_piece(&input_file_path, &output_file_path, *piece_index)
                     .await;
+            if let Err(error) = result {
+                println!("Error: {}", error);
+            };
+        }
+        Command::Download => {
+            let input_file_path = &args[4];
+            let output_file_path = &args[3];
+
+            let result = execute_command_download(&input_file_path, &output_file_path).await;
             if let Err(error) = result {
                 println!("Error: {}", error);
             };
@@ -108,6 +111,24 @@ async fn execute_command_download_piece(
     client.handshake().await?;
 
     let result = client.download_piece(piece_index, output_file_path).await;
+    if let Err(error) = result {
+        println!("Error: \"{}\"", error);
+    }
+
+    client.disconnect().await?;
+    Ok(())
+}
+
+async fn execute_command_download(
+    input_file_path: &str,
+    output_file_path: &str,
+) -> anyhow::Result<()> {
+    let mut client = TorrentClient::from_torrent_file(input_file_path)?;
+    client.fetch_peers().await?;
+    client.connect().await?;
+    client.handshake().await?;
+
+    let result = client.download(output_file_path).await;
     if let Err(error) = result {
         println!("Error: \"{}\"", error);
     }

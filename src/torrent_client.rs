@@ -199,6 +199,78 @@ impl TorrentClient {
             }
         }
     }
+
+    pub async fn download(&mut self, _output_file_path: &str) -> anyhow::Result<()> {
+        // let pieces_count = self.torrent_metainfo.info.pieces_count();
+        // for piece_index in 0..pieces_count {
+        //     self.download_piece(piece_index as u32, output_file_path).await?;
+        // }
+        Ok(())
+    }
+
+    //     let piece_length = self.get_piece_length(piece_index);
+    //     println!("> Piece length: {}", piece_length);
+
+    //     let stream = self
+    //         .stream
+    //         .as_mut()
+    //         .ok_or_else(|| anyhow::Error::msg(Error::TcpStreamNotAvailable))?;
+
+    //     let mut piece_bytes: Vec<u8> = Vec::with_capacity(piece_length);
+
+    //     loop {
+    //         // Wait for the stream to be available
+    //         stream.readable().await?;
+
+    //         // Read a message
+    //         let message = Self::read_message(stream).await?;
+    //         println!("> Received message: {}", message);
+
+    //         // Actionate a received message if necessary
+    //         match message {
+    //             PeerMessage::Bitfield { .. } => {
+    //                 // Send an interested message
+    //                 Self::send_message(stream, PeerMessage::Interested).await?;
+    //             }
+    //             PeerMessage::Unchoke => {
+    //                 // Send the first request message
+    //                 Self::send_download_piece_block_message(stream, piece_index, 0, piece_length)
+    //                     .await?;
+    //             }
+    //             PeerMessage::Piece { begin, block, .. } => {
+    //                 // Append the block's bytes to the already downloaded bytes
+    //                 piece_bytes.extend(block.clone());
+
+    //                 // If it has downloaded all blocks in the piece, break the loop and end
+    //                 let begin_offset = begin as usize + block.len();
+    //                 if begin_offset >= piece_length {
+    //                     // Save the piece bytes
+    //                     self.pieces.resize(piece_index as usize + 1, vec![]);
+    //                     self.pieces[piece_index as usize] = piece_bytes.clone();
+
+    //                     // Verify the piece
+    //                     self.verify_piece(piece_index)?;
+
+    //                     // Save the piece to disk
+    //                     std::fs::write(&output_file_path, piece_bytes)?;
+
+    //                     // Finished
+    //                     break Ok(());
+    //                 }
+
+    //                 // Send followup request messages
+    //                 Self::send_download_piece_block_message(
+    //                     stream,
+    //                     piece_index,
+    //                     begin_offset as u32,
+    //                     piece_length,
+    //                 )
+    //                 .await?;
+    //             }
+    //             _ => {}
+    //         }
+    //     }
+    // }
 }
 
 // Helpers

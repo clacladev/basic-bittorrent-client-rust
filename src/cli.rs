@@ -4,6 +4,7 @@ pub enum Command {
     Peers,
     Handshake,
     DownloadPiece,
+    Download,
 }
 
 impl Command {
@@ -14,6 +15,7 @@ impl Command {
             "peers" => Some(Command::Peers),
             "handshake" => Some(Command::Handshake),
             "download_piece" => Some(Command::DownloadPiece),
+            "download" => Some(Command::Download),
             _ => None,
         };
     }
