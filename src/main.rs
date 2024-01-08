@@ -7,7 +7,6 @@ mod bencode;
 mod cli;
 mod torrent_client;
 
-// Usage: your_bittorrent.sh decode "<encoded_value>"
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args: Vec<String> = env::args().collect();
@@ -21,37 +20,28 @@ async fn main() -> anyhow::Result<()> {
 
     match command {
         Command::Decode => {
-            let _ = execute_command_decode(&args[2]);
+            execute_command_decode(&args[2])?;
         }
         Command::Info => {
-            let _ = execute_command_info(&args[2]);
+            execute_command_info(&args[2])?;
         }
         Command::Peers => {
-            let _ = execute_command_peers(&args[2]).await;
+            execute_command_peers(&args[2]).await?;
         }
         Command::Handshake => {
-            let _ = execute_command_handshake(&args[2]).await;
+            execute_command_handshake(&args[2]).await?;
         }
         Command::DownloadPiece => {
             let input_file_path = &args[4];
             let output_file_path = &args[3];
             let piece_index: &u32 = &args[5].parse()?;
-
-            let result =
-                execute_command_download_piece(&input_file_path, &output_file_path, *piece_index)
-                    .await;
-            if let Err(error) = result {
-                println!("Error: {}", error);
-            };
+            execute_command_download_piece(&input_file_path, &output_file_path, *piece_index)
+                .await?;
         }
         Command::Download => {
             let input_file_path = &args[4];
             let output_file_path = &args[3];
-
-            let result = execute_command_download(&input_file_path, &output_file_path).await;
-            if let Err(error) = result {
-                println!("Error: {}", error);
-            };
+            execute_command_download(&input_file_path, &output_file_path).await?;
         }
     }
 
@@ -63,7 +53,7 @@ async fn main() -> anyhow::Result<()> {
 
 fn execute_command_decode(encoded_value: &str) -> anyhow::Result<()> {
     let decoded_value = bencode::decode_bencoded_value(encoded_value)?;
-    println!("{}", decoded_value);
+    println!("{decoded_value}");
     Ok(())
 }
 
@@ -80,14 +70,14 @@ fn execute_command_info(file_path: &str) -> anyhow::Result<()> {
         .info
         .pieces_hashes()
         .iter()
-        .for_each(|hash| println!("{}", hash));
+        .for_each(|hash| println!("{hash}"));
     Ok(())
 }
 
 async fn execute_command_peers(file_path: &str) -> anyhow::Result<()> {
     let mut client = TorrentClient::from_torrent_file(file_path)?;
     client.fetch_peers().await?;
-    client.peers.iter().for_each(|peer| println!("{}", peer));
+    client.peers.iter().for_each(|peer| println!("{peer}"));
     Ok(())
 }
 
@@ -96,7 +86,7 @@ async fn execute_command_handshake(file_path: &str) -> anyhow::Result<()> {
     client.fetch_peers().await?;
     client.connect().await?;
     let peer_id = client.handshake().await?;
-    println!("Peer ID: {}", peer_id);
+    println!("Peer ID: {peer_id}");
     Ok(())
 }
 
@@ -109,12 +99,8 @@ async fn execute_command_download_piece(
     client.fetch_peers().await?;
     client.connect().await?;
     client.handshake().await?;
-
-    let result = client.download_piece(piece_index, output_file_path).await;
-    if let Err(error) = result {
-        println!("Error: \"{}\"", error);
-    }
-
+    client.download_piece(piece_index.clone()).await?;
+    std::fs::write(&output_file_path, &client.pieces[piece_index as usize])?;
     client.disconnect().await?;
     Ok(())
 }
@@ -127,12 +113,8 @@ async fn execute_command_download(
     client.fetch_peers().await?;
     client.connect().await?;
     client.handshake().await?;
-
-    let result = client.download(output_file_path).await;
-    if let Err(error) = result {
-        println!("Error: \"{}\"", error);
-    }
-
+    client.download().await?;
+    client.save(output_file_path).await?;
     client.disconnect().await?;
     Ok(())
 }

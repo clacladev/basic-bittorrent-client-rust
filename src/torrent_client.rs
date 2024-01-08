@@ -30,7 +30,7 @@ pub struct TorrentClient {
     pub torrent_metainfo: TorrentMetainfo,
     pub peers: Vec<SocketAddr>,
     stream: Option<TcpStream>,
-    pieces: Vec<Vec<u8>>,
+    pub pieces: Vec<Vec<u8>>,
 }
 
 // New and from helpers
@@ -87,7 +87,7 @@ impl TorrentClient {
             return Err(anyhow::Error::msg(Error::NoPeerAvailable));
         };
         self.stream = Some(TcpStream::connect(peer_socket_address).await?);
-        println!("> Connected to {}", peer_socket_address);
+        println!("> Connected to {peer_socket_address}");
         Ok(())
     }
 
@@ -127,17 +127,14 @@ impl TorrentClient {
         let handshake_reply_message = HandshakeMessage::from_bytes(&buffer);
         let peer_id = handshake_reply_message.peer_id;
 
-        println!("> Handshake successful (Peer ID: {})", peer_id);
+        println!("> Handshake successful (Peer ID: {peer_id})");
         Ok(peer_id)
     }
 
-    pub async fn download_piece(
-        &mut self,
-        piece_index: u32,
-        output_file_path: &str,
-    ) -> anyhow::Result<()> {
+    pub async fn download_piece(&mut self, piece_index: u32) -> anyhow::Result<()> {
         let piece_length = self.get_piece_length(piece_index);
-        println!("> Piece length: {}", piece_length);
+        println!("> Starting to download piece {piece_index}");
+        println!("> Piece length: {piece_length} bytes");
 
         let stream = self
             .stream
@@ -152,7 +149,7 @@ impl TorrentClient {
 
             // Read a message
             let message = Self::read_message(stream).await?;
-            println!("> Received message: {}", message);
+            println!("> Received message: {message}");
 
             // Actionate a received message if necessary
             match message {
@@ -177,12 +174,13 @@ impl TorrentClient {
                         self.pieces[piece_index as usize] = piece_bytes.clone();
 
                         // Verify the piece
-                        self.verify_piece(piece_index)?;
-
-                        // Save the piece to disk
-                        std::fs::write(&output_file_path, piece_bytes)?;
+                        let metainfo_piece_hash = self.torrent_metainfo.info.pieces_hashes()
+                            [piece_index as usize]
+                            .clone();
+                        Self::verify_piece(&piece_bytes, metainfo_piece_hash.as_str())?;
 
                         // Finished
+                        println!("> Successfully downloaded piece {piece_index}");
                         break Ok(());
                     }
 
@@ -200,77 +198,23 @@ impl TorrentClient {
         }
     }
 
-    pub async fn download(&mut self, _output_file_path: &str) -> anyhow::Result<()> {
-        // let pieces_count = self.torrent_metainfo.info.pieces_count();
-        // for piece_index in 0..pieces_count {
-        //     self.download_piece(piece_index as u32, output_file_path).await?;
-        // }
+    pub async fn download(&mut self) -> anyhow::Result<()> {
+        let pieces_count = self.torrent_metainfo.info.pieces_count();
+        println!("> Starting to download {pieces_count} pieces");
+
+        for piece_index in 0..pieces_count {
+            self.download_piece(piece_index as u32).await?;
+        }
+
+        println!("> Successfully downloaded file");
         Ok(())
     }
 
-    //     let piece_length = self.get_piece_length(piece_index);
-    //     println!("> Piece length: {}", piece_length);
-
-    //     let stream = self
-    //         .stream
-    //         .as_mut()
-    //         .ok_or_else(|| anyhow::Error::msg(Error::TcpStreamNotAvailable))?;
-
-    //     let mut piece_bytes: Vec<u8> = Vec::with_capacity(piece_length);
-
-    //     loop {
-    //         // Wait for the stream to be available
-    //         stream.readable().await?;
-
-    //         // Read a message
-    //         let message = Self::read_message(stream).await?;
-    //         println!("> Received message: {}", message);
-
-    //         // Actionate a received message if necessary
-    //         match message {
-    //             PeerMessage::Bitfield { .. } => {
-    //                 // Send an interested message
-    //                 Self::send_message(stream, PeerMessage::Interested).await?;
-    //             }
-    //             PeerMessage::Unchoke => {
-    //                 // Send the first request message
-    //                 Self::send_download_piece_block_message(stream, piece_index, 0, piece_length)
-    //                     .await?;
-    //             }
-    //             PeerMessage::Piece { begin, block, .. } => {
-    //                 // Append the block's bytes to the already downloaded bytes
-    //                 piece_bytes.extend(block.clone());
-
-    //                 // If it has downloaded all blocks in the piece, break the loop and end
-    //                 let begin_offset = begin as usize + block.len();
-    //                 if begin_offset >= piece_length {
-    //                     // Save the piece bytes
-    //                     self.pieces.resize(piece_index as usize + 1, vec![]);
-    //                     self.pieces[piece_index as usize] = piece_bytes.clone();
-
-    //                     // Verify the piece
-    //                     self.verify_piece(piece_index)?;
-
-    //                     // Save the piece to disk
-    //                     std::fs::write(&output_file_path, piece_bytes)?;
-
-    //                     // Finished
-    //                     break Ok(());
-    //                 }
-
-    //                 // Send followup request messages
-    //                 Self::send_download_piece_block_message(
-    //                     stream,
-    //                     piece_index,
-    //                     begin_offset as u32,
-    //                     piece_length,
-    //                 )
-    //                 .await?;
-    //             }
-    //             _ => {}
-    //         }
-    //     }
-    // }
+    pub async fn save(&mut self, output_file_path: &str) -> anyhow::Result<()> {
+        let file_bytes = self.pieces.concat();
+        std::fs::write(&output_file_path, file_bytes)?;
+        Ok(())
+    }
 }
 
 // Helpers
@@ -353,20 +297,14 @@ impl TorrentClient {
         piece_length
     }
 
-    fn verify_piece(&self, piece_index: u32) -> anyhow::Result<()> {
-        let piece_bytes = &self.pieces[piece_index as usize];
-
+    fn verify_piece(piece_bytes: &[u8], metainfo_piece_hash: &str) -> anyhow::Result<()> {
         let mut hasher = Sha1::new();
         hasher.update(piece_bytes);
         let piece_hash: String = hasher.finalize().encode_hex::<String>();
 
-        let metainfo_piece_hash =
-            self.torrent_metainfo.info.pieces_hashes()[piece_index as usize].clone();
-
-        if piece_hash != metainfo_piece_hash {
-            return Err(anyhow::Error::msg(Error::PieceHashNotValid));
+        match piece_hash == metainfo_piece_hash {
+            true => Ok(()),
+            false => Err(anyhow::Error::msg(Error::PieceHashNotValid)),
         }
-
-        Ok(())
     }
 }

@@ -44,7 +44,7 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug './your_bittorrent.sh download_piece -o /tmp/test-piece-0 sample.torrent 0'",
+      "name": "Debug './your_bittorrent.sh download -o /tmp/test.txt sample.torrent'",
       "cargo": {
         "args": [
           "build",
@@ -56,13 +56,7 @@
           "kind": "bin"
         }
       },
-      "args": [
-        "download_piece",
-        "-o",
-        "/tmp/test-piece-0",
-        "sample.torrent",
-        "0"
-      ],
+      "args": ["download", "-o", "/tmp/test.txt", "sample.torrent"],
       "cwd": "${workspaceFolder}"
     },
     {
