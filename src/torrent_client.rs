@@ -12,7 +12,7 @@ use tokio::{
     net::TcpStream,
 };
 
-mod error;
+pub mod error;
 mod get_trackers;
 mod handshake_message;
 mod peer_message;
@@ -29,8 +29,8 @@ const PIECE_BLOCK_SIZE: u32 = 16_384; // 16 KiB
 pub struct TorrentClient {
     pub torrent_metainfo: TorrentMetainfo,
     pub peers: Vec<SocketAddr>,
-    stream: Option<TcpStream>,
-    pub pieces: Vec<Vec<u8>>,
+    pub stream: Option<TcpStream>,
+    pieces_bytes: Vec<Vec<u8>>,
 }
 
 // New and from helpers
@@ -40,7 +40,7 @@ impl TorrentClient {
             torrent_metainfo,
             peers: vec![],
             stream: None,
-            pieces: vec![],
+            pieces_bytes: vec![],
         }
     }
 
@@ -131,17 +131,13 @@ impl TorrentClient {
         Ok(peer_id)
     }
 
-    pub async fn download_piece(&mut self, piece_index: u32) -> anyhow::Result<()> {
-        let piece_length = self.get_piece_length(piece_index);
-        println!("> Starting to download piece {piece_index}");
-        println!("> Piece length: {piece_length} bytes");
+    pub async fn prepare_for_download(&mut self) -> anyhow::Result<()> {
+        println!("> Preparing for download");
 
         let stream = self
             .stream
             .as_mut()
             .ok_or_else(|| anyhow::Error::msg(Error::TcpStreamNotAvailable))?;
-
-        let mut piece_bytes: Vec<u8> = Vec::with_capacity(piece_length);
 
         loop {
             // Wait for the stream to be available
@@ -158,40 +154,8 @@ impl TorrentClient {
                     Self::send_message(stream, PeerMessage::Interested).await?;
                 }
                 PeerMessage::Unchoke => {
-                    // Send the first request message
-                    Self::send_download_piece_block_message(stream, piece_index, 0, piece_length)
-                        .await?;
-                }
-                PeerMessage::Piece { begin, block, .. } => {
-                    // Append the block's bytes to the already downloaded bytes
-                    piece_bytes.extend(block.clone());
-
-                    // If it has downloaded all blocks in the piece, break the loop and end
-                    let begin_offset = begin as usize + block.len();
-                    if begin_offset >= piece_length {
-                        // Save the piece bytes
-                        self.pieces.resize(piece_index as usize + 1, vec![]);
-                        self.pieces[piece_index as usize] = piece_bytes.clone();
-
-                        // Verify the piece
-                        let metainfo_piece_hash = self.torrent_metainfo.info.pieces_hashes()
-                            [piece_index as usize]
-                            .clone();
-                        Self::verify_piece(&piece_bytes, metainfo_piece_hash.as_str())?;
-
-                        // Finished
-                        println!("> Successfully downloaded piece {piece_index}");
-                        break Ok(());
-                    }
-
-                    // Send followup request messages
-                    Self::send_download_piece_block_message(
-                        stream,
-                        piece_index,
-                        begin_offset as u32,
-                        piece_length,
-                    )
-                    .await?;
+                    // Success
+                    break Ok(());
                 }
                 _ => {}
             }
@@ -199,11 +163,20 @@ impl TorrentClient {
     }
 
     pub async fn download(&mut self) -> anyhow::Result<()> {
+        let torrent_metainfo = self.torrent_metainfo.clone();
         let pieces_count = self.torrent_metainfo.info.pieces_count();
         println!("> Starting to download {pieces_count} pieces");
 
+        let stream = self
+            .stream
+            .as_mut()
+            .ok_or_else(|| anyhow::Error::msg(Error::TcpStreamNotAvailable))?;
+
         for piece_index in 0..pieces_count {
-            self.download_piece(piece_index as u32).await?;
+            let piece_bytes =
+                Self::download_piece(stream, &torrent_metainfo, piece_index as u32).await?;
+            self.pieces_bytes.resize(piece_index as usize + 1, vec![]);
+            self.pieces_bytes[piece_index as usize] = piece_bytes.clone();
         }
 
         println!("> Successfully downloaded file");
@@ -211,17 +184,86 @@ impl TorrentClient {
     }
 
     pub async fn save(&mut self, output_file_path: &str) -> anyhow::Result<()> {
-        let file_bytes = self.pieces.concat();
+        let file_bytes = self.pieces_bytes.concat();
         std::fs::write(&output_file_path, file_bytes)?;
         Ok(())
     }
 }
 
-// Helpers
 impl TorrentClient {
+    pub async fn download_piece(
+        stream: &mut TcpStream,
+        torrent_metainfo: &TorrentMetainfo,
+        piece_index: u32,
+    ) -> anyhow::Result<Vec<u8>> {
+        println!("> Starting to download piece {piece_index}");
+
+        let piece_length = Self::get_piece_length(&torrent_metainfo, piece_index);
+        println!("> Piece length: {piece_length} bytes");
+
+        let mut piece_bytes: Vec<u8> = Vec::with_capacity(piece_length);
+
+        // Send the first request message
+        Self::send_download_piece_block_message(stream, piece_index, 0, piece_length).await?;
+
+        loop {
+            // Wait for the stream to be available
+            stream.readable().await?;
+
+            // Read a message
+            let message = Self::read_message(stream).await?;
+            println!("> Received message: {message}");
+
+            let PeerMessage::Piece { begin, block, .. } = message else {
+                continue;
+            };
+
+            // Append the block's bytes to the already downloaded bytes
+            piece_bytes.extend(block.clone());
+
+            // If it has downloaded all blocks in the piece, break the loop and end
+            let begin_offset = begin as usize + block.len();
+            if begin_offset >= piece_length {
+                // Verify the piece
+                let metainfo_piece_hash =
+                    torrent_metainfo.info.pieces_hashes()[piece_index as usize].clone();
+                Self::verify_piece(&piece_bytes, metainfo_piece_hash.as_str())?;
+
+                // Finished
+                println!("> Successfully downloaded piece {piece_index}");
+                break Ok(piece_bytes);
+            }
+
+            // Send followup request messages
+            Self::send_download_piece_block_message(
+                stream,
+                piece_index,
+                begin_offset as u32,
+                piece_length,
+            )
+            .await?;
+        }
+    }
+
+    fn get_piece_length(torrent_metainfo: &TorrentMetainfo, piece_index: u32) -> usize {
+        let file_length = torrent_metainfo.info.length;
+        let piece_length = torrent_metainfo.info.piece_length;
+        let pieces_count = torrent_metainfo.info.pieces_count();
+        let piece_length = if piece_index == pieces_count as u32 - 1 {
+            // Last piece
+            file_length % piece_length as usize
+        } else {
+            piece_length
+        };
+        piece_length
+    }
+
     async fn read_message(stream: &mut TcpStream) -> anyhow::Result<PeerMessage> {
         // Read the message size (first 4 bytes)
-        let message_size = stream.read_u32().await?;
+        let message_size = stream.read_u32().await;
+        let Ok(message_size) = message_size else {
+            return Err(anyhow::Error::msg(Error::PeerClosedConnection));
+        };
         if message_size == 0 {
             return Err(anyhow::Error::msg(Error::PeerClosedConnection));
         }
@@ -282,19 +324,6 @@ impl TorrentClient {
             },
         )
         .await
-    }
-
-    fn get_piece_length(&self, piece_index: u32) -> usize {
-        let file_length = self.torrent_metainfo.info.length;
-        let piece_length = self.torrent_metainfo.info.piece_length;
-        let pieces_count = self.torrent_metainfo.info.pieces_count();
-        let piece_length = if piece_index == pieces_count as u32 - 1 {
-            // Last piece
-            file_length % piece_length as usize
-        } else {
-            piece_length
-        };
-        piece_length
     }
 
     fn verify_piece(piece_bytes: &[u8], metainfo_piece_hash: &str) -> anyhow::Result<()> {

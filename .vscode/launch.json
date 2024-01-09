@@ -44,6 +44,30 @@
     {
       "type": "lldb",
       "request": "launch",
+      "name": "Debug './your_bittorrent.sh download_piece -o /tmp/test-piece-0 sample.torrent 0'",
+      "cargo": {
+        "args": [
+          "build",
+          "--bin=bittorrent-starter-rust",
+          "--package=bittorrent-starter-rust"
+        ],
+        "filter": {
+          "name": "bittorrent-starter-rust",
+          "kind": "bin"
+        }
+      },
+      "args": [
+        "download_piece",
+        "-o",
+        "/tmp/test-piece-0",
+        "sample.torrent",
+        "0"
+      ],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
       "name": "Debug './your_bittorrent.sh download -o /tmp/test.txt sample.torrent'",
       "cargo": {
         "args": [

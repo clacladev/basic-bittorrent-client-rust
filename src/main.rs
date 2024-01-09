@@ -99,8 +99,17 @@ async fn execute_command_download_piece(
     client.fetch_peers().await?;
     client.connect().await?;
     client.handshake().await?;
-    client.download_piece(piece_index.clone()).await?;
-    std::fs::write(&output_file_path, &client.pieces[piece_index as usize])?;
+    client.prepare_for_download().await?;
+
+    let mut stream = client
+        .stream
+        .as_mut()
+        .ok_or_else(|| anyhow::Error::msg("TcpStream not available"))?;
+
+    let piece_bytes =
+        TorrentClient::download_piece(&mut stream, &client.torrent_metainfo, piece_index.clone())
+            .await?;
+    std::fs::write(&output_file_path, piece_bytes)?;
     client.disconnect().await?;
     Ok(())
 }
@@ -113,6 +122,7 @@ async fn execute_command_download(
     client.fetch_peers().await?;
     client.connect().await?;
     client.handshake().await?;
+    client.prepare_for_download().await?;
     client.download().await?;
     client.save(output_file_path).await?;
     client.disconnect().await?;
