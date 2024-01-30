@@ -9,8 +9,4 @@ This is a basic BitTorrent client implementation in Rust. It supports single fil
 
 ## How to test
 
-Run `cargo test` to run the tests 2. In the terminal run `./your_bittorrent.sh download -o output_dir target.torrent` to start a download
-
-## How to test
-
 Run `cargo test` to run the tests
